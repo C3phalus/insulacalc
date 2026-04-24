@@ -26,9 +26,10 @@
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
 html,body{height:100%;background:var(--bg);font-family:'DM Sans',sans-serif;color:var(--text);overflow:hidden;}
 #app{display:flex;flex-direction:column;height:100%;max-width:430px;margin:0 auto;position:relative;}
-#header{padding:52px 20px 10px;background:var(--bg);flex-shrink:0;}
-#header h1{font-family:'DM Serif Display',serif;font-size:28px;font-weight:400;letter-spacing:-0.5px;}
-#header p{font-size:13px;color:var(--text2);margin-top:2px;}
+#header{padding:48px 16px 8px;background:var(--bg);flex-shrink:0;display:flex;align-items:center;gap:9px;}
+#header .logo{width:26px;height:26px;background:var(--accent);border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+#header .logo span{font-family:'DM Serif Display',serif;font-size:14px;color:#fff;line-height:1;}
+#header h1{font-family:'DM Serif Display',serif;font-size:16px;font-weight:400;color:var(--text);letter-spacing:-0.2px;}
 
 /* notification permission banner */
 #notif-banner{display:none;margin:0 16px 8px;background:var(--accent-light);border:1px solid rgba(45,90,61,0.2);border-radius:var(--radius-sm);padding:12px 14px;flex-shrink:0;}
@@ -165,8 +166,8 @@ canvas{display:block;}
 <body>
 <div id="app">
   <div id="header">
-    <h1 id="page-title">InsuCalc</h1>
-    <p id="page-sub">Calculate your insulin dose</p>
+    <div class="logo"><span>I</span></div>
+    <h1>InsuCalc</h1>
   </div>
 
   <div id="notif-banner">
@@ -221,13 +222,22 @@ canvas{display:block;}
         <button class="btn-sec" onclick="openGlucoseModal()">Log glucose only</button>
       </div>
       <div class="result-box" id="result-box">
-        <div class="result-num" id="res-total">—</div>
-        <div class="result-unit-lbl">units suggested</div>
-        <div class="breakdown-grid">
+        <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:2px;">
+          <div class="result-num" id="res-total">—</div>
+          <div class="result-unit-lbl">units suggested</div>
+        </div>
+        <div class="breakdown-grid" style="margin-bottom:14px;">
           <div class="bd"><div class="bd-val" id="res-meal">—</div><div class="bd-lbl">Meal dose</div></div>
           <div class="bd"><div class="bd-val" id="res-corr">—</div><div class="bd-lbl">Correction</div></div>
         </div>
-        <p style="font-size:12px;color:var(--accent);margin-top:10px;text-align:center;opacity:0.75;">Saved — you'll be reminded to log post-meal BG in ~2h</p>
+        <div style="border-top:1px solid rgba(45,90,61,0.15);padding-top:12px;">
+          <label style="display:block;font-size:12px;color:var(--accent);font-weight:500;margin-bottom:6px;">Units you will actually take</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <div class="suffix" style="flex:1;"><input type="number" id="actual-dose" step="0.5" min="0" max="100" inputmode="decimal" placeholder="e.g. 4.0 or 4.5" style="background:#fff;border-color:rgba(45,90,61,0.25);"><span class="suffix-label" style="color:var(--accent);opacity:0.7;">u</span></div>
+            <button onclick="confirmDose()" style="padding:12px 16px;border-radius:var(--radius-sm);border:none;background:var(--accent);color:#fff;font-size:14px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;white-space:nowrap;">Save</button>
+          </div>
+          <p style="font-size:11px;color:var(--accent);margin-top:8px;opacity:0.65;">You'll be reminded to log post-meal BG in ~2h</p>
+        </div>
       </div>
       <p class="disclaimer">Always confirm doses with your doctor. This tool supports — but does not replace — your prescribed plan.</p>
     </div>
@@ -385,9 +395,6 @@ function switchTab(name,el){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   document.getElementById('screen-'+name).classList.add('active');
   el.classList.add('active');
-  const titles={calc:['InsuCalc','Calculate your dose'],log:['Log','Your history'],trends:['Trends','Glucose analysis'],settings:['Settings','Doctor-prescribed values']};
-  document.getElementById('page-title').textContent=titles[name][0];
-  document.getElementById('page-sub').textContent=titles[name][1];
   if(name==='log')renderLog();
   if(name==='trends')renderTrends();
   if(name==='settings')loadSettings();
@@ -405,6 +412,8 @@ document.querySelectorAll('.meal-btn').forEach(btn=>{
 });
 
 // ── Calculate dose ──
+let pendingEntry=null;
+
 function calculate(){
   const bg=parseFloat(document.getElementById('c-bg').value);
   const carbs=parseFloat(document.getElementById('c-carbs').value);
@@ -416,17 +425,30 @@ function calculate(){
   document.getElementById('res-total').textContent=total.toFixed(1);
   document.getElementById('res-meal').textContent=mealDose.toFixed(1)+' u';
   document.getElementById('res-corr').textContent=corrDose.toFixed(1)+' u';
+  document.getElementById('actual-dose').value='';
   document.getElementById('result-box').classList.add('show');
   const note=document.getElementById('c-note').value.trim();
   const fasting=document.getElementById('fasting-toggle').classList.contains('on');
+  pendingEntry={meal:selectedMeal,bg,carbs,mealDose:+mealDose.toFixed(2),corrDose:+corrDose.toFixed(2),suggested:+total.toFixed(2),note,fasting};
+  setTimeout(()=>document.getElementById('actual-dose').focus(),100);
+}
+
+function confirmDose(){
+  if(!pendingEntry){showToast('Calculate a dose first');return;}
+  const actual=parseFloat(document.getElementById('actual-dose').value);
+  if(isNaN(actual)||actual<0){showToast('Enter the dose you will take');return;}
   const id=Date.now();
-  const twoHours=2*60*60*1000;
-  log.unshift({id,type:'dose',meal:selectedMeal,bg,carbs,mealDose:+mealDose.toFixed(2),corrDose:+corrDose.toFixed(2),total:+total.toFixed(2),ts:new Date().toISOString(),postBg:null,postTs:null,note,fasting});
+  log.unshift({id,type:'dose',...pendingEntry,total:actual,ts:new Date().toISOString(),postBg:null,postTs:null});
   if(log.length>500)log=log.slice(0,500);
   saveLS();
-  scheduleNotification(id,MEALS[selectedMeal],twoHours);
+  scheduleNotification(id,MEALS[pendingEntry.meal],2*60*60*1000);
+  pendingEntry=null;
+  document.getElementById('result-box').classList.remove('show');
+  document.getElementById('c-bg').value='';
+  document.getElementById('c-carbs').value='';
   document.getElementById('c-note').value='';
   document.getElementById('fasting-toggle').classList.remove('on');
+  showToast('Dose saved');
 }
 
 // ── Glucose only ──
