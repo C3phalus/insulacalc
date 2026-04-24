@@ -1,0 +1,19 @@
+{
+  "name": "InsuCalc",
+  "short_name": "InsuCalc",
+  "description": "Personal insulin dose calculator with glucose tracking",
+  "start_url": "/insulacalc/",
+  "scope": "/insulacalc/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f7f5f0",
+  "theme_color": "#f7f5f0",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
