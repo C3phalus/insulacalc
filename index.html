@@ -5,11 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="InsuCalc">
+<meta name="apple-mobile-web-app-title" content="Glucus">
 <meta name="theme-color" content="#f7f5f0">
 <link rel="manifest" href="./manifest.json">
 <link rel="apple-touch-icon" href="./icon.svg">
-<title>InsuCalc</title>
+<title>Glucus</title>
 <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -29,8 +29,6 @@ html,body{height:100%;background:var(--bg);font-family:'DM Sans',sans-serif;colo
 
 /* header */
 #header{padding:48px 16px 8px;background:var(--bg);flex-shrink:0;display:flex;align-items:center;gap:9px;}
-#header .logo{width:26px;height:26px;background:var(--accent);border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
-#header .logo span{font-family:'DM Serif Display',serif;font-size:14px;color:#fff;line-height:1;}
 #header h1{font-family:'DM Serif Display',serif;font-size:16px;font-weight:400;color:var(--text);letter-spacing:-0.2px;}
 
 /* banners */
@@ -234,8 +232,31 @@ canvas{display:block;}
 <body>
 <div id="app">
   <div id="header">
-    <div class="logo"><span>I</span></div>
-    <h1>InsuCalc</h1>
+    <svg width="28" height="28" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0;border-radius:6px;">
+      <rect width="512" height="512" rx="110" fill="#f5f0eb"/>
+      <g stroke="#6b8f71" stroke-width="18" stroke-linecap="round">
+        <line x1="190" y1="210" x2="225" y2="265"/>
+        <line x1="210" y1="295" x2="268" y2="355"/>
+        <line x1="195" y1="390" x2="235" y2="355"/>
+        <line x1="355" y1="280" x2="395" y2="260"/>
+      </g>
+      <circle cx="285" cy="175" r="28" fill="#7a9e82"/>
+      <circle cx="375" cy="205" r="35" fill="#d4883a"/>
+      <circle cx="148" cy="295" r="32" fill="#4a7a52"/>
+      <circle cx="275" cy="245" r="36" fill="#7a9e82"/>
+      <circle cx="278" cy="440" r="26" fill="#5a8060"/>
+      <circle cx="370" cy="370" r="30" fill="#7a9e82"/>
+      <circle cx="400" cy="430" r="22" fill="#7a9e82"/>
+      <circle cx="178" cy="430" r="25" fill="#5a8060"/>
+      <circle cx="190" cy="210" r="44" fill="#1e4d2b"/>
+      <circle cx="225" cy="265" r="16" fill="#6b8f71"/>
+      <circle cx="210" cy="295" r="38" fill="#7a9e82"/>
+      <circle cx="268" cy="355" r="38" fill="#d4883a"/>
+      <circle cx="195" cy="390" r="32" fill="#5a8060"/>
+      <circle cx="355" cy="280" r="38" fill="#1e4d2b"/>
+      <circle cx="395" cy="260" r="18" fill="#1e4d2b"/>
+    </svg>
+    <h1>Glucus</h1>
   </div>
 
   <div id="notif-banner">

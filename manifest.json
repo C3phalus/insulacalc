@@ -1,6 +1,6 @@
 {
-  "name": "InsuCalc",
-  "short_name": "InsuCalc",
+  "name": "Glucus",
+  "short_name": "Glucus",
   "description": "Personal insulin dose calculator with glucose tracking",
   "start_url": "/insulacalc/",
   "scope": "/insulacalc/",
