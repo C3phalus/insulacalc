@@ -1,4 +1,4 @@
-const CACHE = 'insulacalc-v3';
+const CACHE = 'insulacalc-v5';
 const FILES = ['./', './index.html', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', e => {
@@ -7,10 +7,12 @@ self.addEventListener('install', e => {
 });
 
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(keys =>
-    Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-  ));
-  self.clients.claim();
+  e.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)));
+    await self.clients.claim();
+    await checkPendingNotifications();
+  })());
 });
 
 self.addEventListener('fetch', e => {
@@ -27,22 +29,80 @@ self.addEventListener('notificationclick', e => {
   }));
 });
 
-self.addEventListener('message', e => {
-  if (e.data && e.data.type === 'SCHEDULE_NOTIFICATION') {
-    const { id, meal, delayMs } = e.data;
-    setTimeout(() => {
-      self.registration.showNotification('InsuCalc — Post-meal check', {
-        body: `About 2 hours since your ${meal}. Time to log your post-meal glucose.`,
-        icon: './icon.svg',
-        badge: './icon.svg',
-        tag: 'post-meal-' + id,
-        renotify: true,
-        data: { id }
-      });
-    }, delayMs);
+self.addEventListener('periodicsync', e => {
+  if (e.tag === 'check-notifs') e.waitUntil(checkPendingNotifications());
+});
+
+self.addEventListener('message', async e => {
+  if (!e.data) return;
+  if (e.data.type === 'SCHEDULE_NOTIFICATION') {
+    const { id, meal, fireAt } = e.data;
+    try { const db = await openDB(); await putPending(db, { id, meal, fireAt }); }
+    catch(err) { console.warn('Schedule failed', err); }
   }
-  if (e.data && e.data.type === 'CANCEL_NOTIFICATION') {
-    self.registration.getNotifications({ tag: 'post-meal-' + e.data.id })
-      .then(ns => ns.forEach(n => n.close()));
+  if (e.data.type === 'CANCEL_NOTIFICATION') {
+    try {
+      const db = await openDB(); await deletePending(db, e.data.id);
+      const ns = await self.registration.getNotifications({ tag: 'post-meal-' + e.data.id });
+      ns.forEach(n => n.close());
+    } catch(err) {}
+  }
+  if (e.data.type === 'CHECK_NOTIFICATIONS') {
+    await checkPendingNotifications();
   }
 });
+
+async function checkPendingNotifications() {
+  try {
+    const db = await openDB();
+    const pending = await getAllPending(db);
+    const now = Date.now();
+    for (const item of pending) {
+      if (now >= item.fireAt) {
+        await self.registration.showNotification('InsuCalc — Post-meal check', {
+          body: `About 2 hours since your ${item.meal}. Time to log your post-meal glucose.`,
+          icon: './icon.svg',
+          badge: './icon.svg',
+          tag: 'post-meal-' + item.id,
+          renotify: true,
+          vibrate: [200, 100, 200],
+          data: { id: item.id }
+        });
+        await deletePending(db, item.id);
+      }
+    }
+  } catch(e) { console.warn('Notification check failed', e); }
+}
+
+function openDB() {
+  return new Promise((res, rej) => {
+    const req = indexedDB.open('insulacalc-notifs', 1);
+    req.onupgradeneeded = e => e.target.result.createObjectStore('pending', { keyPath: 'id' });
+    req.onsuccess = e => res(e.target.result);
+    req.onerror = e => rej(e);
+  });
+}
+function getAllPending(db) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction('pending', 'readonly');
+    const req = tx.objectStore('pending').getAll();
+    req.onsuccess = e => res(e.target.result);
+    req.onerror = e => rej(e);
+  });
+}
+function putPending(db, item) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction('pending', 'readwrite');
+    tx.objectStore('pending').put(item);
+    tx.oncomplete = () => res();
+    tx.onerror = e => rej(e);
+  });
+}
+function deletePending(db, id) {
+  return new Promise((res, rej) => {
+    const tx = db.transaction('pending', 'readwrite');
+    tx.objectStore('pending').delete(id);
+    tx.oncomplete = () => res();
+    tx.onerror = e => rej(e);
+  });
+}
