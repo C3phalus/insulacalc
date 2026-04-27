@@ -188,6 +188,19 @@ canvas{display:block;}
 .arrow-usage-bar{height:100%;background:var(--accent);border-radius:4px;}
 .arrow-usage-count{font-size:12px;color:var(--text3);min-width:24px;text-align:right;}
 
+/* IOB */
+.iob-bar{background:var(--surface2);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:12px;display:none;}
+.iob-bar.show{display:block;}
+.iob-row{display:flex;align-items:center;justify-content:space-between;}
+.iob-val{font-family:'DM Serif Display',serif;font-size:22px;color:var(--amber);}
+.iob-lbl{font-size:12px;color:var(--text3);margin-top:1px;}
+.iob-track{height:4px;background:var(--border);border-radius:2px;margin-top:8px;overflow:hidden;}
+.iob-fill{height:100%;background:var(--amber);border-radius:2px;transition:width 0.4s;}
+.situation-row{display:flex;gap:6px;margin-bottom:12px;}
+.sit-btn{flex:1;padding:9px 4px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);cursor:pointer;font-size:12px;color:var(--text2);text-align:center;line-height:1.4;font-family:'DM Sans',sans-serif;transition:all 0.15s;}
+.sit-btn.active{background:var(--amber);color:#fff;border-color:var(--amber);}
+.sit-btn .sit-icon{font-size:18px;display:block;margin-bottom:2px;}
+
 /* settings */
 .ratio-row{display:flex;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);}
 .ratio-row:last-child{border-bottom:none;}
@@ -235,8 +248,11 @@ canvas{display:block;}
   </div>
 
   <div id="stack-warning">
-    <div class="sw-title">⚠️ Active insulin detected</div>
-    <div class="sw-body" id="stack-warning-body">A dose was logged less than 2 hours ago. Stacking insulin can cause hypoglycaemia — proceed carefully.</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:3px;">
+      <div class="sw-title">⚠️ Active insulin detected</div>
+      <button onclick="document.getElementById('stack-warning').classList.remove('show')" style="background:none;border:none;font-size:18px;color:var(--high);cursor:pointer;opacity:0.6;line-height:1;padding:0;">&#215;</button>
+    </div>
+    <div class="sw-body" id="stack-warning-body"></div>
   </div>
 
   <div id="nudge">
@@ -253,6 +269,15 @@ canvas{display:block;}
     <!-- CALC -->
     <div class="screen active" id="screen-calc">
       <div class="card">
+        <!-- IOB indicator -->
+        <div class="iob-bar" id="iob-bar">
+          <div class="iob-row">
+            <div><div class="iob-val" id="iob-val">—</div><div class="iob-lbl">Active insulin on board</div></div>
+            <div style="text-align:right;"><div style="font-size:12px;color:var(--text3);" id="iob-time">—</div><div style="font-size:11px;color:var(--text3);margin-top:2px;" id="iob-enabled-lbl"></div></div>
+          </div>
+          <div class="iob-track"><div class="iob-fill" id="iob-fill" style="width:0%"></div></div>
+        </div>
+
         <p class="card-label">Select meal</p>
         <div class="meal-grid">
           <button class="meal-btn active" data-idx="0">Breakfast</button>
@@ -273,7 +298,12 @@ canvas{display:block;}
         </div>
         <p class="trend-label" id="trend-label">Stable — no adjustment</p>
 
-        <div class="field">
+        <p class="card-label" style="margin-bottom:8px;">Current situation</p>
+        <div class="situation-row" id="situation-row">
+          <button class="sit-btn active" data-sit="0"><span class="sit-icon">🧘</span>Normal</button>
+          <button class="sit-btn" data-sit="1"><span class="sit-icon">🏃</span>Active</button>
+          <button class="sit-btn" data-sit="2"><span class="sit-icon">🤒</span>Unwell</button>
+        </div>
           <label>Current blood glucose</label>
           <div class="suffix"><input type="number" id="c-bg" placeholder="e.g. 140" min="40" max="600" inputmode="decimal"><span class="suffix-label">mg/dL</span></div>
         </div>
@@ -296,10 +326,11 @@ canvas{display:block;}
       <div class="result-box" id="result-box">
         <div class="result-num" id="res-total">—</div>
         <div class="result-unit-lbl">units suggested</div>
-        <div class="breakdown-grid">
-          <div class="bd"><div class="bd-val" id="res-meal">—</div><div class="bd-lbl">Meal dose</div></div>
+        <div class="breakdown-grid" style="grid-template-columns:repeat(4,1fr);">
+          <div class="bd"><div class="bd-val" id="res-meal">—</div><div class="bd-lbl">Meal</div></div>
           <div class="bd"><div class="bd-val" id="res-corr">—</div><div class="bd-lbl">Correction</div></div>
-          <div class="bd"><div class="bd-val" id="res-trend">—</div><div class="bd-lbl">Trend adj.</div></div>
+          <div class="bd"><div class="bd-val" id="res-trend">—</div><div class="bd-lbl">Trend</div></div>
+          <div class="bd"><div class="bd-val" id="res-iob">—</div><div class="bd-lbl">IOB adj.</div></div>
         </div>
         <div style="border-top:1px solid rgba(45,90,61,0.15);padding-top:12px;">
           <label style="display:block;font-size:12px;color:var(--accent);font-weight:500;margin-bottom:6px;">Units you will actually take</label>
@@ -356,6 +387,15 @@ canvas{display:block;}
         <p class="card-label">Correction settings</p>
         <div class="ratio-row"><span class="ratio-name">Correction factor</span><input type="number" id="s-isf" min="1" max="500"><span class="unit-tag">mg/dL/u</span></div>
         <div class="ratio-row"><span class="ratio-name">Target glucose</span><input type="number" id="s-target" min="60" max="200"><span class="unit-tag">mg/dL</span></div>
+      </div>
+      <div class="card">
+        <p class="card-label">Insulin on board (IOB)</p>
+        <div class="toggle-row" style="padding:0 0 10px;">
+          <label>Enable IOB calculation</label>
+          <div class="toggle" id="iob-toggle" onclick="this.classList.toggle('on');updateIOBDisplay()"></div>
+        </div>
+        <p style="font-size:12px;color:var(--text3);margin-bottom:10px;">Active insulin duration set by your doctor. IOB is subtracted from the correction dose only.</p>
+        <div class="ratio-row"><span class="ratio-name">Insulin duration</span><input type="number" id="s-iob-duration" min="2" max="6" step="0.5"><span class="unit-tag">hours</span></div>
       </div>
       <div class="card">
         <p class="card-label">Glucose trend adjustment</p>
@@ -422,26 +462,31 @@ canvas{display:block;}
 const MEALS=['Breakfast','Mid-morning snack','Lunch','Afternoon snack','Dinner','Late night'];
 const TREND_SYMBOLS=['↑','↗','→','↘','↓'];
 const TREND_LABELS=['Fast rise — more insulin','Slow rise — slightly more','Stable — no adjustment','Slow fall — slightly less','Fast fall — less insulin'];
+const SIT_LABELS=['Normal','Active / Exercise','Unwell / Stressed'];
+// Situation speed modifiers: active = 20% faster decay, unwell = 20% slower
+const SIT_DECAY=[1.0, 1.2, 0.8];
 const DEFAULTS={
   ratios:[10,12,10,15,10,15],isf:50,target:100,
-  trendEnabled:false,
-  trendMultipliers:[120,110,100,90,80]
+  trendEnabled:false,trendMultipliers:[120,110,100,90,80],
+  iobEnabled:false,iobDuration:3.5
 };
 
 let settings=JSON.parse(localStorage.getItem('ic_settings')||'null')||JSON.parse(JSON.stringify(DEFAULTS));
-// migrate old settings that may not have trend fields
 if(!settings.trendMultipliers) settings.trendMultipliers=[120,110,100,90,80];
 if(settings.trendEnabled===undefined) settings.trendEnabled=false;
+if(settings.iobEnabled===undefined) settings.iobEnabled=false;
+if(!settings.iobDuration) settings.iobDuration=3.5;
 
 let log=JSON.parse(localStorage.getItem('ic_log')||'[]');
 let suggestResetTs=parseInt(localStorage.getItem('ic_sreset')||'0');
 let notifDismissed=localStorage.getItem('ic_notif_dismissed')==='1';
 let selectedMeal=0;
-let selectedTrend=2; // default stable
+let selectedTrend=2;
+let selectedSituation=0; // 0=Normal, 1=Active, 2=Unwell
 let logFilter='all';
 let swReg=null;
 let pendingEntry=null;
-let weeklyMode='rolling'; // 'rolling' or 'calendar'
+let weeklyMode='rolling';
 
 function saveLS(){
   localStorage.setItem('ic_settings',JSON.stringify(settings));
@@ -462,11 +507,24 @@ async function registerSW(){
 }
 function scheduleNotification(id,meal,delayMs){
   if(!swReg||Notification.permission!=='granted')return;
-  swReg.active&&swReg.active.postMessage({type:'SCHEDULE_NOTIFICATION',id,meal,delayMs});
+  const fireAt=Date.now()+delayMs;
+  const sw=swReg.active||swReg.installing||swReg.waiting;
+  if(sw) sw.postMessage({type:'SCHEDULE_NOTIFICATION',id,meal,fireAt});
+  // Register periodic background sync if supported (Android Chrome)
+  if('periodicSync' in swReg){
+    swReg.periodicSync.register('check-notifs',{minInterval:15*60*1000}).catch(()=>{});
+  }
 }
 function cancelNotification(id){
   if(!swReg)return;
-  swReg.active&&swReg.active.postMessage({type:'CANCEL_NOTIFICATION',id});
+  const sw=swReg.active||swReg.installing||swReg.waiting;
+  if(sw) sw.postMessage({type:'CANCEL_NOTIFICATION',id});
+}
+// Tell SW to check notifications every time app is opened
+function checkSWNotifications(){
+  if(!swReg)return;
+  const sw=swReg.active||swReg.installing||swReg.waiting;
+  if(sw) sw.postMessage({type:'CHECK_NOTIFICATIONS'});
 }
 
 // ── Notifications ──
@@ -487,12 +545,12 @@ async function requestNotifPermission(){
 // ── Stacking warning ──
 function checkStackWarning(){
   const now=Date.now();
-  const twoH=2*60*60*1000;
+  const twoH=120*60*1000;
   const recent=log.find(e=>e.type==='dose'&&(now-new Date(e.ts).getTime())<twoH);
   const el=document.getElementById('stack-warning');
   if(recent){
-    const mins=Math.round((now-new Date(recent.ts).getTime())/60000);
-    document.getElementById('stack-warning-body').textContent=`A dose was logged ${mins} min ago. Stacking insulin can cause hypoglycaemia — proceed carefully.`;
+    const mins=Math.floor((now-new Date(recent.ts).getTime())/60000);
+    document.getElementById('stack-warning-body').textContent=`A dose was logged ${mins} min ago (under 2h). Stacking insulin can cause hypoglycaemia — proceed carefully.`;
     el.classList.add('show');
   } else {
     el.classList.remove('show');
@@ -545,6 +603,61 @@ document.querySelectorAll('.trend-btn').forEach(btn=>{
   });
 });
 
+// ── Situation selector ──
+document.querySelectorAll('.sit-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.sit-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedSituation=parseInt(btn.dataset.sit);
+    updateIOBDisplay();
+    document.getElementById('result-box').classList.remove('show');
+  });
+});
+
+// ── IOB engine ──
+// Uses a linear decay curve adjusted for situation speed
+// decay factor: at t=0 → 100% active, at t=duration → 0% active
+function computeIOB(){
+  if(!settings.iobEnabled) return 0;
+  const now=Date.now();
+  const durationMs=settings.iobDuration*60*60*1000;
+  const speedMult=SIT_DECAY[selectedSituation];
+  let iob=0;
+  log.filter(e=>e.type==='dose').forEach(e=>{
+    const elapsed=(now-new Date(e.ts).getTime());
+    const effectiveDuration=durationMs/speedMult;
+    if(elapsed>=effectiveDuration) return; // fully decayed
+    const remaining=1-(elapsed/effectiveDuration);
+    // Use a slightly curved decay — peak at 25% of duration, tail off
+    const t=elapsed/effectiveDuration;
+    const curve=t<0.25?(1-Math.pow(t/0.25-1,2)*0.15):(1-t);
+    iob+=e.total*Math.max(0,Math.min(1,curve));
+  });
+  return Math.max(0,iob);
+}
+
+function updateIOBDisplay(){
+  const iob=computeIOB();
+  const bar=document.getElementById('iob-bar');
+  const enabled=settings.iobEnabled;
+  bar.classList.toggle('show', enabled);
+  if(!enabled) return;
+  document.getElementById('iob-val').textContent=iob.toFixed(1)+' u';
+  // Find most recent dose for time display
+  const recent=log.find(e=>e.type==='dose');
+  if(recent){
+    const mins=Math.floor((Date.now()-new Date(recent.ts).getTime())/60000);
+    document.getElementById('iob-time').textContent=`Last dose ${mins}m ago`;
+  }
+  document.getElementById('iob-enabled-lbl').textContent=SIT_LABELS[selectedSituation];
+  // Track: show % of duration elapsed for most recent dose
+  const durationMs=settings.iobDuration*60*60*1000;
+  const speedMult=SIT_DECAY[selectedSituation];
+  const effectiveDuration=durationMs/speedMult;
+  const recentElapsed=recent?Math.min(1,(Date.now()-new Date(recent.ts).getTime())/effectiveDuration):0;
+  document.getElementById('iob-fill').style.width=Math.round(recentElapsed*100)+'%';
+}
+
 // ── Calculate ──
 function calculate(){
   const bg=parseFloat(document.getElementById('c-bg').value);
@@ -553,27 +666,36 @@ function calculate(){
   const icr=settings.ratios[selectedMeal];
   const mealDose=carbs/icr;
   const corrDose=(bg-settings.target)/settings.isf;
-  let subtotal=mealDose+corrDose;
+
+  // IOB: subtract from correction only, floor correction at its most negative value
+  const iob=computeIOB();
+  const iobAdj=settings.iobEnabled ? -Math.min(iob, Math.max(0, corrDose+iob)) : 0;
+  const corrAfterIOB=corrDose+iobAdj;
+
+  let subtotal=mealDose+corrAfterIOB;
   let trendAdj=0;
   if(settings.trendEnabled){
     const mult=settings.trendMultipliers[selectedTrend]/100;
-    const adjusted=Math.max(0,subtotal)*mult;
-    trendAdj=adjusted-Math.max(0,subtotal);
+    trendAdj=Math.max(0,subtotal)*mult - Math.max(0,subtotal);
   }
   const total=Math.max(0,subtotal+(settings.trendEnabled?trendAdj:0));
+
   document.getElementById('res-total').textContent=total.toFixed(1);
   document.getElementById('res-meal').textContent=mealDose.toFixed(1)+' u';
-  document.getElementById('res-corr').textContent=corrDose.toFixed(1)+' u';
-  document.getElementById('res-trend').textContent=settings.trendEnabled?(trendAdj>=0?'+':'')+trendAdj.toFixed(1)+' u':'off';
+  document.getElementById('res-corr').textContent=corrAfterIOB.toFixed(1)+' u';
+  document.getElementById('res-trend').textContent=settings.trendEnabled?(trendAdj>=0?'+':'')+trendAdj.toFixed(1)+' u':'—';
+  document.getElementById('res-iob').textContent=settings.iobEnabled?(iobAdj!==0?iobAdj.toFixed(1)+' u':'0 u'):'—';
   document.getElementById('actual-dose').value='';
   document.getElementById('result-box').classList.add('show');
+
   const note=document.getElementById('c-note').value.trim();
   const fasting=document.getElementById('fasting-toggle').classList.contains('on');
   pendingEntry={meal:selectedMeal,bg,carbs,
     mealDose:+mealDose.toFixed(2),corrDose:+corrDose.toFixed(2),
+    iobAdj:+iobAdj.toFixed(2),iob:+iob.toFixed(2),situation:selectedSituation,
     trendAdj:+trendAdj.toFixed(2),suggested:+total.toFixed(2),
     trend:selectedTrend,trendEnabled:settings.trendEnabled,
-    note,fasting};
+    iobEnabled:settings.iobEnabled,note,fasting};
   setTimeout(()=>document.getElementById('actual-dose').focus(),100);
 }
 
@@ -1019,6 +1141,11 @@ function loadSettings(){
     </div>`).join('');
   document.getElementById('s-isf').value=settings.isf;
   document.getElementById('s-target').value=settings.target;
+  // IOB
+  const iobToggle=document.getElementById('iob-toggle');
+  if(settings.iobEnabled) iobToggle.classList.add('on'); else iobToggle.classList.remove('on');
+  document.getElementById('s-iob-duration').value=settings.iobDuration;
+  // Trend
   const tToggle=document.getElementById('trend-toggle');
   if(settings.trendEnabled) tToggle.classList.add('on'); else tToggle.classList.remove('on');
   settings.trendMultipliers.forEach((v,i)=>{const el=document.getElementById('tm-'+i);if(el&&i!==2)el.value=v;});
@@ -1035,13 +1162,15 @@ function saveSettings(){
   const isf=parseFloat(document.getElementById('s-isf').value);
   const target=parseFloat(document.getElementById('s-target').value);
   if(isNaN(isf)||isNaN(target)){showToast('Check correction values');return;}
+  const iobEnabled=document.getElementById('iob-toggle').classList.contains('on');
+  const iobDuration=parseFloat(document.getElementById('s-iob-duration').value)||3.5;
   const trendEnabled=document.getElementById('trend-toggle').classList.contains('on');
   const trendMultipliers=settings.trendMultipliers.map((_,i)=>{
     if(i===2)return 100;
     return parseInt(document.getElementById('tm-'+i).value)||settings.trendMultipliers[i];
   });
-  settings={ratios,isf,target,trendEnabled,trendMultipliers};
-  saveLS();updateTrendUI();
+  settings={ratios,isf,target,iobEnabled,iobDuration,trendEnabled,trendMultipliers};
+  saveLS();updateTrendUI();updateIOBDisplay();
   showToast('Settings saved');
 }
 
@@ -1054,9 +1183,11 @@ function resetSuggestions(){
 registerSW().then(()=>{
   loadSettings();
   updateTrendUI();
+  updateIOBDisplay();
   checkStackWarning();
   checkNudge();
   checkNotifBanner();
+  checkSWNotifications();
 });
 </script>
 </body>
