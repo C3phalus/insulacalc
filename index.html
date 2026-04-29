@@ -186,13 +186,23 @@ canvas{display:block;}
 .arrow-usage-bar{height:100%;background:var(--accent);border-radius:4px;}
 .arrow-usage-count{font-size:12px;color:var(--text3);min-width:24px;text-align:right;}
 
-/* IOB */
-.iob-bar{background:var(--surface2);border-radius:var(--radius-sm);padding:10px 12px;margin-bottom:12px;display:none;}
-.iob-bar.show{display:block;}
-.iob-row{display:flex;align-items:center;justify-content:space-between;}
-.iob-val{font-family:'DM Serif Display',serif;font-size:22px;color:var(--amber);}
+/* IOB floating pill */
+#iob-float{display:none;position:sticky;top:0;z-index:50;margin:0 0 8px;flex-shrink:0;}
+#iob-float.show{display:block;}
+.iob-pill{display:flex;align-items:center;justify-content:space-between;background:var(--amber);border-radius:20px;padding:7px 14px;cursor:pointer;transition:border-radius 0.2s;}
+.iob-pill.expanded{border-radius:var(--radius-sm) var(--radius-sm) 0 0;}
+.iob-pill-left{display:flex;align-items:center;gap:8px;}
+.iob-pill-dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.5);}
+.iob-pill-txt{font-size:13px;font-weight:500;color:#fff;}
+.iob-pill-sub{font-size:11px;color:rgba(255,255,255,0.75);}
+.iob-pill-arrow{font-size:12px;color:rgba(255,255,255,0.75);transition:transform 0.2s;}
+.iob-pill-arrow.open{transform:rotate(180deg);}
+.iob-panel{display:none;background:var(--amber-light);border:1px solid rgba(193,123,58,0.2);border-top:none;border-radius:0 0 var(--radius-sm) var(--radius-sm);padding:10px 14px;}
+.iob-panel.show{display:block;}
+.iob-panel-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.iob-val{font-family:'DM Serif Display',serif;font-size:28px;color:var(--amber);line-height:1;}
 .iob-lbl{font-size:12px;color:var(--text3);margin-top:1px;}
-.iob-track{height:4px;background:var(--border);border-radius:2px;margin-top:8px;overflow:hidden;}
+.iob-track{height:4px;background:rgba(193,123,58,0.2);border-radius:2px;margin-top:4px;overflow:hidden;}
 .iob-fill{height:100%;background:var(--amber);border-radius:2px;transition:width 0.4s;}
 .situation-row{display:flex;gap:6px;margin-bottom:12px;}
 .sit-btn{flex:1;padding:6px 4px 8px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);cursor:pointer;font-size:11px;color:var(--text2);text-align:center;line-height:1.3;font-family:'DM Sans',sans-serif;transition:all 0.15s;}
@@ -232,29 +242,13 @@ canvas{display:block;}
 <body>
 <div id="app">
   <div id="header">
-    <svg width="28" height="28" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0;border-radius:6px;">
-      <rect width="512" height="512" rx="110" fill="#f5f0eb"/>
-      <g stroke="#6b8f71" stroke-width="18" stroke-linecap="round">
-        <line x1="190" y1="210" x2="225" y2="265"/>
-        <line x1="210" y1="295" x2="268" y2="355"/>
-        <line x1="195" y1="390" x2="235" y2="355"/>
-        <line x1="355" y1="280" x2="395" y2="260"/>
-      </g>
-      <circle cx="285" cy="175" r="28" fill="#7a9e82"/>
-      <circle cx="375" cy="205" r="35" fill="#d4883a"/>
-      <circle cx="148" cy="295" r="32" fill="#4a7a52"/>
-      <circle cx="275" cy="245" r="36" fill="#7a9e82"/>
-      <circle cx="278" cy="440" r="26" fill="#5a8060"/>
-      <circle cx="370" cy="370" r="30" fill="#7a9e82"/>
-      <circle cx="400" cy="430" r="22" fill="#7a9e82"/>
-      <circle cx="178" cy="430" r="25" fill="#5a8060"/>
-      <circle cx="190" cy="210" r="44" fill="#1e4d2b"/>
-      <circle cx="225" cy="265" r="16" fill="#6b8f71"/>
-      <circle cx="210" cy="295" r="38" fill="#7a9e82"/>
-      <circle cx="268" cy="355" r="38" fill="#d4883a"/>
-      <circle cx="195" cy="390" r="32" fill="#5a8060"/>
-      <circle cx="355" cy="280" r="38" fill="#1e4d2b"/>
-      <circle cx="395" cy="260" r="18" fill="#1e4d2b"/>
+    <svg width="28" height="28" viewBox="0 0 1254 1254" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0;border-radius:6px;">
+      <path d="M0 0 C413.82 0 827.64 0 1254 0 C1254 413.82 1254 827.64 1254 1254 C840.18 1254 426.36 1254 0 1254 C0 840.18 0 426.36 0 0 Z" fill="#F8F2EA"/>
+      <path d="M0 0 C14.24502368 10.91247227 23.46153322 25.17875983 26.9921875 42.83203125 C28.07723916 67.42069106 23.59584392 81.05154662 14.2421875 95.08203125 C16.61214879 100.79436093 19.3046875 103.39453125 27.79272461 111.1237793 C32.80325836 115.50237625 37.46737498 120.20028304 42.1484375 124.92578125 C49.33530774 132.1426957 52.28025062 135.10987146 62.53552246 145.4263916 C67.98498535 150.91247559 72.39495919 155.33990623 81.61462402 163.68055725 C85.42587236 167.16537621 87.2421875 169.01953125 90.2421875 172.08203125 C107.2585383 160.82748419 122.71578874 157.42816837 140.57324219 160.48046875 C156.40395226 164.31107333 169.88415236 174.12518898 178.78125 187.6796875 C187.49373154 231.12064453 185.83729914 238.85348272 181.6796875 247.01953125 C173.29669279 262.96963858 161.19441079 272.54528796 146.6796875 278.0546875 C116.86142339 282.09029431 104.2421875 276.08203125 70.1875 237.9296875 C67.05329934 207.45351637 73.2421875 194.08203125 76.21484375 187.0703125 C70.6796875 180.26953125 55.56359174 166.7101292 43.7734375 154.7109375 C29.80627441 140.71478271 12.72375911 123.60175212 -0.7578125 110.08203125 C-27.38848145 122.56726982 -62.67724609 116.91210938 -100.3125 77.65625 C-106.88609188 61.39993494 -104.99154271 42.85615088 -98.47265625 26.9453125 C-90.48049796 9.55847232 -39.66483651 -16.67722161 0 0 Z" fill="#556F54" transform="translate(524.7578125,562.91796875)"/>
+      <path d="M0 0 C12.76004567 9.62819715 22.29343483 24.07576882 25 40 C26.39899411 55.17247613 18 82 18 82 C27.75 89.6875 38 99.5 49.57373047 110.59326172 C63.33373117 123.18728226 78.40625 137.4296875 82.4375 147.3125 C80.59507763 155.49051946 77 159 64.45703125 162.63671875 C46.77103419 148.93146198 27.95776367 130.73291016 18.5 121.5 C11.96510954 114.90126383 -2 103 -2 103 C-20.37461286 112.64834976 -53.4375 111.4375 -91.5 79.27734375 C-99.62099984 62.47944229 -94 28 -60 -7 C-39.5506814 -14.52464104 -18.2132691 -11.9842837 0 0 Z" fill="#1B472E" transform="translate(457,319)"/>
+      <path d="M0 0 C14.85 11.22 22.11 24.75 24 42 C22.44 57.09 16.76 68.47 6 79 C21.12 93.15 35.64 106.08 49 121 C52.77 126.35 53.65 130.87 52 137 C47.85 144.23 41.72 147.16 33 147 C22.66 143.31 15.35 133.05 7 126 C1.98 121.38 -3.41 117.28 -9 113 C-25.19 121.56 -43.05 123.19 -61 118 C-79.7 111.01 -92.62 96.87 -99 78 C-104.14 60.71 -101.36 41.79 -93 26 C-78.2 0.65 -49.46 -11.38 -21 -8 C-13.27 -6.37 -6.21 -3.35 0 0 Z" fill="#C17C3A" transform="translate(840,598)"/>
+      <path d="M0 0 C13.2 9.9 21.12 22.44 24 38 C24.75 56.1 19.47 70.2 8 82 C23.1 96.15 36.63 109.68 49 125 C52.44 131.33 51.81 136.89 48 142 C43.01 146.47 37.95 147.9 31 146 C20.35 141.02 12.18 130.57 3 123 C-1.65 119.07 -5.94 115.62 -11 112 C-26.79 120.23 -44.33 122.64 -62 118 C-81.12 111.49 -94.17 97.41 -100 78 C-105.1 60.34 -102.29 41.56 -94 26 C-79.01 0.27 -50.51 -11.65 -22 -8 C-14.19 -6.3 -6.93 -3.27 0 0 Z" fill="#1B462D" transform="translate(753,812)"/>
+      <path d="M0 0 C9.24 6.93 15.84 15.84 19 27 C20.79 41.91 19.14 54.87 11 67 C24.42 80.08 37.18 92.17 49 106 C52.91 112.53 52.24 118.59 48 124 C43.01 128.14 37.96 129.24 31 128 C20.03 123.02 12.17 112.94 3 105 C-1.32 101.35 -5.27 98.26 -10 95 C-24.64 103.61 -41.18 106.02 -58 102 C-78.46 95.42 -92.42 79.56 -97 59 C-100.65 41.18 -96.8 24.15 -87 10 C-72.14 -9.9 -49.06 -17.36 -25 -14 C-16.01 -12.17 -7.7 -7.1 0 0 Z" fill="#506E4F" transform="translate(615,831)"/>
     </svg>
     <h1>Glucus</h1>
   </div>
@@ -289,17 +283,29 @@ canvas{display:block;}
 
     <!-- CALC -->
     <div class="screen active" id="screen-calc">
-      <div class="card">
-        <!-- IOB indicator -->
-        <div class="iob-bar" id="iob-bar">
-          <div class="iob-row">
-            <div><div class="iob-val" id="iob-val">—</div><div class="iob-lbl">Active insulin on board</div></div>
-            <div style="text-align:right;"><div style="font-size:12px;color:var(--text3);" id="iob-time">—</div><div style="font-size:11px;color:var(--text3);margin-top:2px;" id="iob-enabled-lbl"></div></div>
+
+      <!-- Floating IOB pill -->
+      <div id="iob-float">
+        <div class="iob-pill" id="iob-pill" onclick="toggleIOBPanel()">
+          <div class="iob-pill-left">
+            <div class="iob-pill-dot" id="iob-dot"></div>
+            <div>
+              <div class="iob-pill-txt" id="iob-pill-txt">— u active insulin</div>
+              <div class="iob-pill-sub" id="iob-pill-sub">tap to expand</div>
+            </div>
+          </div>
+          <div class="iob-pill-arrow" id="iob-arrow">▼</div>
+        </div>
+        <div class="iob-panel" id="iob-panel">
+          <div class="iob-panel-row">
+            <div><div class="iob-val" id="iob-val">—</div><div class="iob-lbl">units still active</div></div>
+            <div style="text-align:right;"><div style="font-size:12px;color:var(--text2);" id="iob-time">—</div><div style="font-size:11px;color:var(--text3);margin-top:2px;" id="iob-enabled-lbl"></div></div>
           </div>
           <div class="iob-track"><div class="iob-fill" id="iob-fill" style="width:0%"></div></div>
         </div>
+      </div>
 
-        <p class="card-label">Select meal</p>
+      <div class="card">
         <div class="meal-grid">
           <button class="meal-btn active" data-idx="0">Breakfast</button>
           <button class="meal-btn" data-idx="1">Mid-morning snack</button>
@@ -682,24 +688,36 @@ function computeIOB(){
 
 function updateIOBDisplay(){
   const iob=computeIOB();
-  const bar=document.getElementById('iob-bar');
   const enabled=settings.iobEnabled;
-  bar.classList.toggle('show', enabled);
-  if(!enabled) return;
-  document.getElementById('iob-val').textContent=iob.toFixed(1)+' u';
-  // Find most recent dose for time display
+  const float=document.getElementById('iob-float');
+  if(!enabled||iob<0.05){float.classList.remove('show');return;}
+  float.classList.add('show');
+  // pill summary
+  document.getElementById('iob-pill-txt').textContent=iob.toFixed(1)+' u active insulin';
   const recent=log.find(e=>e.type==='dose');
   if(recent){
     const mins=Math.floor((Date.now()-new Date(recent.ts).getTime())/60000);
-    document.getElementById('iob-time').textContent=`Last dose ${mins}m ago`;
+    document.getElementById('iob-pill-sub').textContent=`${mins} min ago · tap to expand`;
+    document.getElementById('iob-time').textContent=`Last dose ${mins} min ago`;
   }
+  // panel detail
+  document.getElementById('iob-val').textContent=iob.toFixed(1)+' u';
   document.getElementById('iob-enabled-lbl').textContent=SIT_LABELS[selectedSituation];
-  // Track: show % of duration elapsed for most recent dose
   const durationMs=settings.iobDuration*60*60*1000;
   const speedMult=SIT_DECAY[selectedSituation];
   const effectiveDuration=durationMs/speedMult;
   const recentElapsed=recent?Math.min(1,(Date.now()-new Date(recent.ts).getTime())/effectiveDuration):0;
   document.getElementById('iob-fill').style.width=Math.round(recentElapsed*100)+'%';
+}
+
+function toggleIOBPanel(){
+  const panel=document.getElementById('iob-panel');
+  const arrow=document.getElementById('iob-arrow');
+  const pill=document.getElementById('iob-pill');
+  const isOpen=panel.classList.contains('show');
+  panel.classList.toggle('show',!isOpen);
+  arrow.classList.toggle('open',!isOpen);
+  pill.classList.toggle('expanded',!isOpen);
 }
 
 // ── Calculate ──
