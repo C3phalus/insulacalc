@@ -185,21 +185,11 @@ canvas{display:block;}
 /* IOB floating pill */
 #iob-float{display:none;position:sticky;top:0;z-index:50;margin:0 0 8px;flex-shrink:0;}
 #iob-float.show{display:block;}
-.iob-pill{display:flex;align-items:center;justify-content:space-between;background:var(--amber);border-radius:20px;padding:7px 14px;cursor:pointer;transition:border-radius 0.2s;}
-.iob-pill.expanded{border-radius:var(--radius-sm) var(--radius-sm) 0 0;}
+.iob-pill{display:flex;align-items:center;background:var(--amber);border-radius:20px;padding:7px 14px;pointer-events:none;}
 .iob-pill-left{display:flex;align-items:center;gap:8px;}
 .iob-pill-dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.5);}
 .iob-pill-txt{font-size:13px;font-weight:500;color:#fff;}
 .iob-pill-sub{font-size:11px;color:rgba(255,255,255,0.75);}
-.iob-pill-arrow{font-size:12px;color:rgba(255,255,255,0.75);transition:transform 0.2s;}
-.iob-pill-arrow.open{transform:rotate(180deg);}
-.iob-panel{display:none;background:var(--amber-light);border:1px solid rgba(193,123,58,0.2);border-top:none;border-radius:0 0 var(--radius-sm) var(--radius-sm);padding:10px 14px;}
-.iob-panel.show{display:block;}
-.iob-panel-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
-.iob-val{font-family:'DM Serif Display',serif;font-size:28px;color:var(--amber);line-height:1;}
-.iob-lbl{font-size:12px;color:var(--text3);margin-top:1px;}
-.iob-track{height:4px;background:rgba(193,123,58,0.2);border-radius:2px;margin-top:4px;overflow:hidden;}
-.iob-fill{height:100%;background:var(--amber);border-radius:2px;transition:width 0.4s;}
 .situation-row{display:flex;gap:6px;margin-bottom:12px;}
 .sit-btn{flex:1;padding:6px 4px 8px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);cursor:pointer;font-size:11px;color:var(--text2);text-align:center;line-height:1.3;font-family:'DM Sans',sans-serif;transition:all 0.15s;}
 .sit-btn.active{background:var(--amber);color:#fff;border-color:var(--amber);}
@@ -233,6 +223,26 @@ canvas{display:block;}
 .toast{position:absolute;bottom:calc(var(--tab-h) + 12px);left:50%;transform:translateX(-50%) translateY(20px);background:var(--text);color:#fff;font-size:13px;padding:10px 20px;border-radius:20px;opacity:0;transition:all 0.25s;pointer-events:none;white-space:nowrap;z-index:300;}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
 .disclaimer{font-size:12px;color:var(--text3);line-height:1.6;padding:10px 4px 0;}
+
+/* food memory */
+#fm-panel{display:none;margin-top:6px;}
+#fm-panel.show{display:block;}
+.fm-matches{display:flex;flex-direction:column;gap:6px;margin-bottom:8px;max-height:200px;overflow-y:auto;}
+.fm-match{display:flex;align-items:center;justify-content:space-between;padding:9px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);cursor:pointer;transition:all 0.15s;}
+.fm-match.selected{border-color:var(--accent);background:var(--accent-light);}
+.fm-match-left{display:flex;flex-direction:column;gap:2px;}
+.fm-match-note{font-size:13px;font-weight:500;color:var(--text);}
+.fm-match-meta{font-size:11px;color:var(--text3);}
+.fm-match-right{display:flex;flex-direction:column;align-items:flex-end;gap:2px;}
+.fm-match-dose{font-size:14px;font-weight:500;color:var(--accent);}
+.fm-match-post{font-size:11px;font-weight:500;padding:2px 6px;border-radius:10px;}
+.fm-suggestion{background:var(--accent-light);border:1px solid rgba(45,90,61,0.2);border-radius:var(--radius-sm);padding:10px 12px;display:flex;align-items:center;justify-content:space-between;}
+.fm-suggestion-label{font-size:12px;color:var(--accent);font-weight:500;}
+.fm-suggestion-val{font-family:'DM Serif Display',serif;font-size:26px;color:var(--accent);line-height:1;}
+.fm-suggestion-sub{font-size:11px;color:var(--accent);opacity:0.7;}
+.fm-empty{font-size:12px;color:var(--text3);padding:8px 4px;font-style:italic;}
+.fm-warning{font-size:11px;color:var(--amber);padding:4px 0 0;}
+.note-edit-btn{background:none;border:none;cursor:pointer;font-size:11px;color:var(--text3);padding:2px 0 0;font-family:'DM Sans',sans-serif;text-decoration:underline;}
 </style>
 </head>
 <body>
@@ -268,22 +278,14 @@ canvas{display:block;}
 
       <!-- Floating IOB pill -->
       <div id="iob-float">
-        <div class="iob-pill" id="iob-pill" onclick="toggleIOBPanel()">
+        <div class="iob-pill" id="iob-pill">
           <div class="iob-pill-left">
             <div class="iob-pill-dot" id="iob-dot"></div>
             <div>
               <div class="iob-pill-txt" id="iob-pill-txt">— u active insulin</div>
-              <div class="iob-pill-sub" id="iob-pill-sub">tap to expand</div>
+              <div class="iob-pill-sub" id="iob-pill-sub"></div>
             </div>
           </div>
-          <div class="iob-pill-arrow" id="iob-arrow">▼</div>
-        </div>
-        <div class="iob-panel" id="iob-panel">
-          <div class="iob-panel-row">
-            <div><div class="iob-val" id="iob-val">—</div><div class="iob-lbl">units still active</div></div>
-            <div style="text-align:right;"><div style="font-size:12px;color:var(--text2);" id="iob-time">—</div><div style="font-size:11px;color:var(--text3);margin-top:2px;" id="iob-enabled-lbl"></div></div>
-          </div>
-          <div class="iob-track"><div class="iob-fill" id="iob-fill" style="width:0%"></div></div>
         </div>
       </div>
 
@@ -340,6 +342,22 @@ canvas{display:block;}
           </div>
         </div>
 
+        <!-- Food memory panel — shown when note typed + no carbs -->
+        <div id="fm-panel">
+          <div id="fm-matches" class="fm-matches"></div>
+          <div id="fm-suggestion" class="fm-suggestion" style="display:none;">
+            <div>
+              <div class="fm-suggestion-label">🧠 Food Memory suggestion</div>
+              <div class="fm-suggestion-sub" id="fm-suggestion-sub"></div>
+            </div>
+            <div style="text-align:right;">
+              <div class="fm-suggestion-val" id="fm-suggestion-val">—</div>
+              <div style="font-size:11px;color:var(--accent);opacity:0.7;">net food dose</div>
+            </div>
+          </div>
+          <div class="fm-warning" id="fm-warning" style="display:none;">⚠️ Limited data — fewer than 2 entries with post-BG. Use with caution.</div>
+        </div>
+
         <!-- Situation — below carbs, smaller buttons -->
         <div class="situation-row" id="situation-row">
           <button class="sit-btn active" data-sit="0"><span class="sit-icon">🧘</span>Normal</button>
@@ -351,7 +369,8 @@ canvas{display:block;}
           <label>Fasting reading</label>
           <div class="toggle" id="fasting-toggle" onclick="this.classList.toggle('on')"></div>
         </div>
-        <button class="btn-primary" onclick="calculate()">Calculate dose</button>
+        <button class="btn-primary" id="btn-calculate" onclick="calculate()">Calculate dose</button>
+        <button class="btn-sec" id="btn-manual-mode" style="display:none;" onclick="openManualDose()">Log dose manually</button>
         <button class="btn-sec" onclick="openGlucoseModal()">Log glucose only</button>
       </div>
 
@@ -369,6 +388,20 @@ canvas{display:block;}
           <div style="display:flex;gap:8px;align-items:center;">
             <div class="suffix" style="flex:1;"><input type="number" id="actual-dose" step="0.5" min="0" max="100" inputmode="decimal" placeholder="e.g. 4.0 or 4.5" style="background:#fff;border-color:rgba(45,90,61,0.25);"><span class="suffix-label" style="color:var(--accent);opacity:0.7;">u</span></div>
             <button onclick="confirmDose()" style="padding:12px 16px;border-radius:var(--radius-sm);border:none;background:var(--accent);color:#fff;font-size:14px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;white-space:nowrap;">Save</button>
+          </div>
+          <p style="font-size:11px;color:var(--accent);margin-top:8px;opacity:0.65;">You'll be reminded to log post-meal BG in ~2h</p>
+        </div>
+      </div>
+      <div class="result-box" id="manual-dose-box" style="display:none;">
+        <div style="margin-bottom:10px;">
+          <div style="font-size:13px;font-weight:500;color:var(--accent);margin-bottom:2px;">Log dose manually</div>
+          <div style="font-size:12px;color:var(--accent);opacity:0.7;">No history yet for this meal — your entry will seed future suggestions.</div>
+        </div>
+        <div style="border-top:1px solid rgba(45,90,61,0.15);padding-top:12px;">
+          <label style="display:block;font-size:12px;color:var(--accent);font-weight:500;margin-bottom:6px;">Units you will take</label>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <div class="suffix" style="flex:1;"><input type="number" id="manual-dose-input" step="0.5" min="0" max="100" inputmode="decimal" placeholder="e.g. 5" style="background:#fff;border-color:rgba(45,90,61,0.25);"><span class="suffix-label" style="color:var(--accent);opacity:0.7;">u</span></div>
+            <button onclick="confirmManualDose()" style="padding:12px 16px;border-radius:var(--radius-sm);border:none;background:var(--accent);color:#fff;font-size:14px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;white-space:nowrap;">Save</button>
           </div>
           <p style="font-size:11px;color:var(--accent);margin-top:8px;opacity:0.65;">You'll be reminded to log post-meal BG in ~2h</p>
         </div>
@@ -466,6 +499,20 @@ canvas{display:block;}
         <textarea id="g-note" placeholder="e.g. morning fasting, before exercise…"></textarea>
       </div>
       <button class="btn-primary" onclick="saveGlucoseOnly()">Save reading</button>
+    </div>
+  </div>
+
+  <!-- NOTE EDIT MODAL -->
+  <div class="modal-wrap" id="note-edit-modal">
+    <div class="modal">
+      <button class="modal-close" onclick="closeNoteEditModal()">&#215;</button>
+      <div class="modal-title">Edit note</div>
+      <div class="field" style="margin-bottom:16px;">
+        <label>Note</label>
+        <textarea id="note-edit-input" placeholder="e.g. sushi, pasta…" style="height:72px;"></textarea>
+      </div>
+      <button class="btn-primary" onclick="saveNoteEdit()">Save</button>
+      <button class="btn-ghost" onclick="closeNoteEditModal()">Cancel</button>
     </div>
   </div>
 
@@ -654,36 +701,15 @@ function computeIOB(){
 
 function updateIOBDisplay(){
   const iob=computeIOB();
-  const enabled=settings.iobEnabled;
   const float=document.getElementById('iob-float');
-  if(!enabled||iob<0.05){float.classList.remove('show');return;}
+  if(!settings.iobEnabled||iob<0.05){float.classList.remove('show');return;}
   float.classList.add('show');
-  // pill summary
   document.getElementById('iob-pill-txt').textContent=iob.toFixed(1)+' u active insulin';
   const recent=log.find(e=>e.type==='dose');
   if(recent){
     const mins=Math.floor((Date.now()-new Date(recent.ts).getTime())/60000);
-    document.getElementById('iob-pill-sub').textContent=`${mins} min ago · tap to expand`;
-    document.getElementById('iob-time').textContent=`Last dose ${mins} min ago`;
+    document.getElementById('iob-pill-sub').textContent=`${mins} min ago · ${SIT_LABELS[selectedSituation]}`;
   }
-  // panel detail
-  document.getElementById('iob-val').textContent=iob.toFixed(1)+' u';
-  document.getElementById('iob-enabled-lbl').textContent=SIT_LABELS[selectedSituation];
-  const durationMs=settings.iobDuration*60*60*1000;
-  const speedMult=SIT_DECAY[selectedSituation];
-  const effectiveDuration=durationMs/speedMult;
-  const recentElapsed=recent?Math.min(1,(Date.now()-new Date(recent.ts).getTime())/effectiveDuration):0;
-  document.getElementById('iob-fill').style.width=Math.round(recentElapsed*100)+'%';
-}
-
-function toggleIOBPanel(){
-  const panel=document.getElementById('iob-panel');
-  const arrow=document.getElementById('iob-arrow');
-  const pill=document.getElementById('iob-pill');
-  const isOpen=panel.classList.contains('show');
-  panel.classList.toggle('show',!isOpen);
-  arrow.classList.toggle('open',!isOpen);
-  pill.classList.toggle('expanded',!isOpen);
 }
 
 // ── Calculate ──
@@ -695,7 +721,12 @@ function calculate(){
   if(isNaN(carbs)){showToast('Enter a valid carb amount or leave blank');return;}
   const noCarbs=carbsRaw==='';
   const icr=settings.ratios[selectedMeal];
-  const mealDose=noCarbs?0:carbs/icr;
+
+  // Food memory: use weighted net food dose if FM is active
+  const fmActive=isFMActive();
+  const fmNetFood=fmActive?getFMNetFoodDose():null;
+  const mealDose=fmActive&&fmNetFood!==null ? fmNetFood : (noCarbs?0:carbs/icr);
+
   const corrDose=(bg-settings.target)/settings.isf;
 
   // IOB: subtract from correction only, floor correction at its most negative value
@@ -712,10 +743,16 @@ function calculate(){
   const total=Math.max(0,subtotal+(settings.trendEnabled?trendAdj:0));
 
   document.getElementById('res-total').textContent=total.toFixed(1);
-  document.getElementById('res-meal').textContent=noCarbs?'— (no carbs)':mealDose.toFixed(1)+' u';
+  document.getElementById('res-meal').textContent=fmActive
+    ? '🧠 '+mealDose.toFixed(1)+' u'
+    : (noCarbs?'— (no carbs)':mealDose.toFixed(1)+' u');
   document.getElementById('res-corr').textContent=corrAfterIOB.toFixed(1)+' u';
   document.getElementById('res-trend').textContent=settings.trendEnabled?(trendAdj>=0?'+':'')+trendAdj.toFixed(1)+' u':'—';
   document.getElementById('res-iob').textContent=settings.iobEnabled?(iobAdj!==0?iobAdj.toFixed(1)+' u':'0 u'):'—';
+
+  // Update breakdown label for meal dose
+  document.querySelector('.bd-lbl').textContent=fmActive?'Food Memory':'Meal';
+
   document.getElementById('actual-dose').value='';
   document.getElementById('result-box').classList.add('show');
 
@@ -726,7 +763,8 @@ function calculate(){
     iobAdj:+iobAdj.toFixed(2),iob:+iob.toFixed(2),situation:selectedSituation,
     trendAdj:+trendAdj.toFixed(2),suggested:+total.toFixed(2),
     trend:selectedTrend,trendEnabled:settings.trendEnabled,
-    iobEnabled:settings.iobEnabled,note,fasting};
+    iobEnabled:settings.iobEnabled,note,fasting,
+    foodMemory:fmActive};
   setTimeout(()=>document.getElementById('actual-dose').focus(),100);
 }
 
@@ -745,6 +783,11 @@ function confirmDose(){
   document.getElementById('c-carbs').value='';
   document.getElementById('c-note').value='';
   document.getElementById('fasting-toggle').classList.remove('on');
+  // Reset food memory
+  document.getElementById('fm-panel').classList.remove('show');
+  fmSelected.clear();fmMatches=[];
+  // Reset breakdown label
+  document.querySelector('.bd-lbl').textContent='Meal';
   showToast('Dose saved');
 }
 
@@ -831,7 +874,7 @@ function renderLog(){
       const c=getBgColor(e.bg,settings.target);
       return`<div class="log-entry type-glucose">
         <div class="log-header">
-          <div><div class="log-meal">Glucose${e.fasting?' <span class="status-badge badge-fasting">Fasting</span>':''}</div>${e.note?`<div class="log-note">${e.note}</div>`:''}</div>
+          <div><div class="log-meal">Glucose${e.fasting?' <span class="status-badge badge-fasting">Fasting</span>':''}</div>${e.note?`<div class="log-note">${e.note} <button class="note-edit-btn" onclick="openNoteEditModal(${e.id})">edit</button></div>`:`<button class="note-edit-btn" onclick="openNoteEditModal(${e.id})">+ add note</button>`}</div>
           <div style="display:flex;align-items:center;gap:4px;"><div class="log-date">${dateStr}<br>${timeStr}</div><button class="delete-btn" onclick="deleteEntry(${e.id})">&#215;</button></div>
         </div>
         <div style="display:flex;align-items:baseline;gap:6px;"><span class="glucose-big" style="color:${c.fg};">${e.bg}</span><span style="font-size:13px;color:var(--text3);">mg/dL</span></div>
@@ -853,7 +896,7 @@ function renderLog(){
           </div></div>`;
     return`<div class="log-entry">
       <div class="log-header">
-        <div><div class="log-meal">${MEALS[e.meal]} ${trendStr?`<span style="font-size:14px;">${trendStr}</span>`:''}${e.noCarbs?'<span class="status-badge" style="background:var(--amber-light);color:var(--amber);">🍽️ No carbs</span>':''}${e.fasting?' <span class="status-badge badge-fasting">Fasting</span>':''}</div>${e.note?`<div class="log-note">${e.note}</div>`:''}</div>
+        <div><div class="log-meal">${MEALS[e.meal]} ${trendStr?`<span style="font-size:14px;">${trendStr}</span>`:''}${e.noCarbs?'<span class="status-badge" style="background:var(--amber-light);color:var(--amber);">🍽️ No carbs</span>':''}${e.foodMemory?'<span class="status-badge" style="background:var(--accent-light);color:var(--accent);">🧠 Food Memory</span>':''}${e.manualDose?'<span class="status-badge" style="background:var(--surface2);color:var(--text2);">✏️ Manual</span>':''}${e.fasting?' <span class="status-badge badge-fasting">Fasting</span>':''}</div>${e.note?`<div class="log-note">${e.note} <button class="note-edit-btn" onclick="openNoteEditModal(${e.id})">edit</button></div>`:`<button class="note-edit-btn" onclick="openNoteEditModal(${e.id})">+ add note</button>`}</div>
         <div style="display:flex;align-items:center;gap:4px;"><div class="log-date">${dateStr}<br>${timeStr}</div><button class="delete-btn" onclick="deleteEntry(${e.id})">&#215;</button></div>
       </div>
       <div class="log-stats">
@@ -1207,6 +1250,274 @@ function saveSettings(){
 function resetSuggestions(){
   suggestResetTs=Date.now();saveLS();loadSettings();
   showToast('Suggestions reset — collecting new data');
+}
+
+// ── Manual dose mode ──
+function updateCalcButtons(){
+  const carbs=document.getElementById('c-carbs').value;
+  const note=document.getElementById('c-note').value.trim();
+  const noCarbs=carbs==='';
+  const hasNote=note.length>=2;
+  const hasMatches=fmMatches.length>0;
+
+  // Show manual button only when: no carbs + note typed + no FM matches
+  const showManual=noCarbs&&hasNote&&!hasMatches;
+  document.getElementById('btn-calculate').style.display=showManual?'none':'block';
+  document.getElementById('btn-manual-mode').style.display=showManual?'block':'none';
+
+  // Hide manual box if we switch back to calculate mode
+  if(!showManual){
+    document.getElementById('manual-dose-box').style.display='none';
+  }
+}
+
+function openManualDose(){
+  const bg=parseFloat(document.getElementById('c-bg').value);
+  if(isNaN(bg)){showToast('Enter your blood glucose first');return;}
+  document.getElementById('manual-dose-box').style.display='block';
+  setTimeout(()=>document.getElementById('manual-dose-input').focus(),100);
+}
+
+function confirmManualDose(){
+  const bg=parseFloat(document.getElementById('c-bg').value);
+  if(isNaN(bg)){showToast('Enter your blood glucose first');return;}
+  const actual=parseFloat(document.getElementById('manual-dose-input').value);
+  if(isNaN(actual)||actual<0){showToast('Enter the dose you will take');return;}
+
+  // Silently calculate corrDose for future food memory quality
+  const corrDose=(bg-settings.target)/settings.isf;
+  const iob=computeIOB();
+  const iobAdj=settings.iobEnabled?-Math.min(iob,Math.max(0,corrDose+iob)):0;
+
+  const note=document.getElementById('c-note').value.trim();
+  const fasting=document.getElementById('fasting-toggle').classList.contains('on');
+  const id=Date.now();
+
+  log.unshift({
+    id, type:'dose',
+    meal:selectedMeal, bg,
+    carbs:null, noCarbs:true,
+    mealDose:0,
+    corrDose:+corrDose.toFixed(2),
+    iobAdj:+iobAdj.toFixed(2),
+    iob:+iob.toFixed(2),
+    situation:selectedSituation,
+    trendAdj:0,
+    suggested:null,
+    trend:selectedTrend,
+    trendEnabled:settings.trendEnabled,
+    iobEnabled:settings.iobEnabled,
+    note, fasting,
+    noCarbs:true,
+    manualDose:true,
+    foodMemory:false,
+    total:actual,
+    ts:new Date().toISOString(),
+    postBg:null, postTs:null
+  });
+  if(log.length>500)log=log.slice(0,500);
+  saveLS();
+  scheduleNotification(id,MEALS[selectedMeal],2*60*60*1000);
+
+  // Reset form
+  document.getElementById('c-bg').value='';
+  document.getElementById('c-carbs').value='';
+  document.getElementById('c-note').value='';
+  document.getElementById('manual-dose-input').value='';
+  document.getElementById('fasting-toggle').classList.remove('on');
+  document.getElementById('manual-dose-box').style.display='none';
+  document.getElementById('fm-panel').classList.remove('show');
+  fmSelected.clear();fmMatches=[];
+  updateCalcButtons();
+  showToast('Dose saved');
+}
+
+// ── Food Memory ──
+let fmSelected=new Set(); // set of entry ids selected by user
+let fmMatches=[]; // current matched entries
+let fmDebounce=null;
+
+function fmSearch(){
+  const note=document.getElementById('c-note').value.trim().toLowerCase();
+  const carbs=document.getElementById('c-carbs').value;
+  const panel=document.getElementById('fm-panel');
+
+  // Only activate when carbs are blank and note has 2+ chars
+  if(carbs!==''||note.length<2){
+    panel.classList.remove('show');
+    fmSelected.clear();
+    fmMatches=[];
+    updateCalcButtons();
+    return;
+  }
+
+  // Search past dose entries with matching note
+  const keywords=note.split(/\s+/).filter(k=>k.length>=2);
+  fmMatches=log.filter(e=>{
+    if(e.type!=='dose'||!e.note) return false;
+    const n=e.note.toLowerCase();
+    return keywords.some(k=>n.includes(k));
+  });
+
+  const matchesEl=document.getElementById('fm-matches');
+  if(!fmMatches.length){
+    matchesEl.innerHTML=`<div class="fm-empty">No past entries found for "${note}"</div>`;
+    document.getElementById('fm-suggestion').style.display='none';
+    document.getElementById('fm-warning').style.display='none';
+    panel.classList.add('show');
+    fmSelected.clear();
+    updateCalcButtons();
+    return;
+  }
+
+  panel.classList.add('show');
+  fmSelected.clear();
+  renderFMMatches();
+  updateFMSuggestion();
+  updateCalcButtons();
+}
+
+function renderFMMatches(){
+  const matchesEl=document.getElementById('fm-matches');
+  matchesEl.innerHTML=fmMatches.map(e=>{
+    const d=new Date(e.ts);
+    const dateStr=d.toLocaleDateString('pt-PT',{day:'2-digit',month:'short'});
+    const netFood=Math.max(0,e.total-(e.corrDose||0));
+    let postHtml='';
+    if(e.postBg!==null){
+      const c=getBgColor(e.postBg,settings.target);
+      postHtml=`<span class="fm-match-post" style="background:${c.bg};color:${c.fg};">→ ${e.postBg} mg/dL</span>`;
+    } else {
+      postHtml=`<span style="font-size:11px;color:var(--text3);">no post-BG</span>`;
+    }
+    const sel=fmSelected.has(e.id)?'selected':'';
+    return`<div class="fm-match ${sel}" onclick="fmToggleMatch(${e.id})" data-id="${e.id}">
+      <div class="fm-match-left">
+        <div class="fm-match-note">${e.note}</div>
+        <div class="fm-match-meta">${MEALS[e.meal]} · ${dateStr} · pre ${e.bg} mg/dL</div>
+      </div>
+      <div class="fm-match-right">
+        <div class="fm-match-dose">${e.total}u taken</div>
+        ${postHtml}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function fmToggleMatch(id){
+  if(fmSelected.has(id)) fmSelected.delete(id);
+  else fmSelected.add(id);
+  renderFMMatches();
+  updateFMSuggestion();
+}
+
+function updateFMSuggestion(){
+  const suggEl=document.getElementById('fm-suggestion');
+  const valEl=document.getElementById('fm-suggestion-val');
+  const subEl=document.getElementById('fm-suggestion-sub');
+  const warnEl=document.getElementById('fm-warning');
+
+  // Use selected entries if any, else all matches
+  const pool=fmSelected.size>0
+    ? fmMatches.filter(e=>fmSelected.has(e.id))
+    : fmMatches;
+
+  if(!pool.length){
+    suggEl.style.display='none';
+    warnEl.style.display='none';
+    return;
+  }
+
+  const withPost=pool.filter(e=>e.postBg!==null);
+  const now=Date.now();
+
+  // Compute weighted average net food dose
+  // Weight = recency * outcome quality (if postBg available)
+  let totalWeight=0, weightedDose=0;
+  pool.forEach(e=>{
+    const ageDays=(now-new Date(e.ts).getTime())/(24*60*60*1000);
+    const recencyW=Math.max(0.1,1-(ageDays/90)*0.9);
+    let outcomeW=0.5; // neutral if no postBg
+    if(e.postBg!==null){
+      // closer to target = higher weight, max 1.0
+      const delta=Math.abs(e.postBg-settings.target);
+      outcomeW=Math.max(0.1,1-(delta/150));
+    }
+    const w=recencyW*outcomeW;
+    const netFood=Math.max(0,e.total-(e.corrDose||0));
+    weightedDose+=netFood*w;
+    totalWeight+=w;
+  });
+
+  const netFoodDose=totalWeight>0?weightedDose/totalWeight:0;
+  valEl.textContent=netFoodDose.toFixed(1)+'u';
+  subEl.textContent=`from ${pool.length} match${pool.length>1?'es':''}${fmSelected.size>0?' (selected)':' (tap to select)'}`;
+  suggEl.style.display='flex';
+
+  // Warning if fewer than 2 entries have postBg
+  warnEl.style.display=withPost.length<2?'block':'none';
+}
+
+function getFMNetFoodDose(){
+  const pool=fmSelected.size>0
+    ? fmMatches.filter(e=>fmSelected.has(e.id))
+    : fmMatches;
+  if(!pool.length) return null;
+  const now=Date.now();
+  let totalWeight=0,weightedDose=0;
+  pool.forEach(e=>{
+    const ageDays=(now-new Date(e.ts).getTime())/(24*60*60*1000);
+    const recencyW=Math.max(0.1,1-(ageDays/90)*0.9);
+    let outcomeW=0.5;
+    if(e.postBg!==null){const delta=Math.abs(e.postBg-settings.target);outcomeW=Math.max(0.1,1-(delta/150));}
+    const w=recencyW*outcomeW;
+    weightedDose+=Math.max(0,e.total-(e.corrDose||0))*w;
+    totalWeight+=w;
+  });
+  return totalWeight>0?weightedDose/totalWeight:0;
+}
+
+function isFMActive(){
+  const carbs=document.getElementById('c-carbs').value;
+  const note=document.getElementById('c-note').value.trim();
+  return carbs===''&&note.length>=2&&fmMatches.length>0;
+}
+
+// Wire up note field with debounce
+document.getElementById('c-note').addEventListener('input',()=>{
+  clearTimeout(fmDebounce);
+  fmDebounce=setTimeout(fmSearch,350);
+});
+// Also hide panel if carbs are entered
+document.getElementById('c-carbs').addEventListener('input',()=>{
+  if(document.getElementById('c-carbs').value!==''){
+    document.getElementById('fm-panel').classList.remove('show');
+    fmSelected.clear();fmMatches=[];
+  }
+  updateCalcButtons();
+});
+
+// ── Note editing ──
+let noteEditId=null;
+function openNoteEditModal(id){
+  noteEditId=id;
+  const entry=log.find(e=>e.id===id);
+  if(!entry)return;
+  document.getElementById('note-edit-input').value=entry.note||'';
+  document.getElementById('note-edit-modal').classList.add('show');
+  setTimeout(()=>document.getElementById('note-edit-input').focus(),100);
+}
+function closeNoteEditModal(){
+  document.getElementById('note-edit-modal').classList.remove('show');
+  noteEditId=null;
+}
+function saveNoteEdit(){
+  if(!noteEditId)return;
+  const entry=log.find(e=>e.id===noteEditId);
+  if(!entry)return;
+  entry.note=document.getElementById('note-edit-input').value.trim();
+  saveLS();closeNoteEditModal();renderLog();
+  showToast('Note updated');
 }
 
 // ── Init ──
