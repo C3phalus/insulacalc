@@ -327,7 +327,7 @@ canvas{display:block;}
         <!-- Carbs + food note side by side -->
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
           <div>
-            <label style="display:block;font-size:12px;color:var(--text2);margin-bottom:6px;font-weight:500;">Carbohydrates</label>
+            <label style="display:block;font-size:12px;color:var(--text2);margin-bottom:6px;font-weight:500;">Carbohydrates <span style="font-weight:400;color:var(--text3);">(opt.)</span></label>
             <div style="position:relative;">
               <input type="number" id="c-carbs" placeholder="e.g. 45" min="0" max="500" inputmode="decimal"
                 style="width:100%;border:1px solid var(--border);border-radius:var(--radius-sm);padding:11px 28px 11px 14px;font-size:16px;font-family:'DM Sans',sans-serif;background:var(--surface2);color:var(--text);appearance:none;">
@@ -712,7 +712,7 @@ function calculate(){
   const total=Math.max(0,subtotal+(settings.trendEnabled?trendAdj:0));
 
   document.getElementById('res-total').textContent=total.toFixed(1);
-  document.getElementById('res-meal').textContent=mealDose.toFixed(1)+' u';
+  document.getElementById('res-meal').textContent=noCarbs?'— (no carbs)':mealDose.toFixed(1)+' u';
   document.getElementById('res-corr').textContent=corrAfterIOB.toFixed(1)+' u';
   document.getElementById('res-trend').textContent=settings.trendEnabled?(trendAdj>=0?'+':'')+trendAdj.toFixed(1)+' u':'—';
   document.getElementById('res-iob').textContent=settings.iobEnabled?(iobAdj!==0?iobAdj.toFixed(1)+' u':'0 u'):'—';
@@ -721,7 +721,7 @@ function calculate(){
 
   const note=document.getElementById('c-note').value.trim();
   const fasting=document.getElementById('fasting-toggle').classList.contains('on');
-  pendingEntry={meal:selectedMeal,bg,carbs,
+  pendingEntry={meal:selectedMeal,bg,carbs:noCarbs?null:carbs,noCarbs,
     mealDose:+mealDose.toFixed(2),corrDose:+corrDose.toFixed(2),
     iobAdj:+iobAdj.toFixed(2),iob:+iob.toFixed(2),situation:selectedSituation,
     trendAdj:+trendAdj.toFixed(2),suggested:+total.toFixed(2),
@@ -853,12 +853,12 @@ function renderLog(){
           </div></div>`;
     return`<div class="log-entry">
       <div class="log-header">
-        <div><div class="log-meal">${MEALS[e.meal]} ${trendStr?`<span style="font-size:14px;">${trendStr}</span>`:''}${e.fasting?' <span class="status-badge badge-fasting">Fasting</span>':''}</div>${e.note?`<div class="log-note">${e.note}</div>`:''}</div>
+        <div><div class="log-meal">${MEALS[e.meal]} ${trendStr?`<span style="font-size:14px;">${trendStr}</span>`:''}${e.noCarbs?'<span class="status-badge" style="background:var(--amber-light);color:var(--amber);">🍽️ No carbs</span>':''}${e.fasting?' <span class="status-badge badge-fasting">Fasting</span>':''}</div>${e.note?`<div class="log-note">${e.note}</div>`:''}</div>
         <div style="display:flex;align-items:center;gap:4px;"><div class="log-date">${dateStr}<br>${timeStr}</div><button class="delete-btn" onclick="deleteEntry(${e.id})">&#215;</button></div>
       </div>
       <div class="log-stats">
         <div class="log-stat"><div class="log-stat-val">${e.bg}</div><div class="log-stat-lbl">Pre BG mg/dL</div></div>
-        <div class="log-stat"><div class="log-stat-val">${e.carbs}g</div><div class="log-stat-lbl">Carbs</div></div>
+        <div class="log-stat"><div class="log-stat-val">${e.noCarbs?'—':e.carbs+'g'}</div><div class="log-stat-lbl">${e.noCarbs?'No carbs':'Carbs'}</div></div>
         <div class="log-stat log-dose"><div class="log-stat-val">${e.total} u</div><div class="log-stat-lbl">Actual dose</div></div>
       </div>${postSection}
     </div>`;
