@@ -120,6 +120,7 @@ html,body{height:100%;background:var(--bg);font-family:'DM Sans',sans-serif;colo
 .log-stat-val{font-size:16px;font-weight:500;color:var(--text);}
 .log-stat-lbl{font-size:10px;color:var(--text3);margin-top:1px;}
 .log-dose{background:var(--accent-light);}.log-dose .log-stat-val{color:var(--accent);}
+.log-suggested{font-size:10px;color:var(--text3);margin-top:2px;}
 .log-note{font-size:12px;color:var(--text2);margin-top:8px;font-style:italic;}
 .post-row{margin-top:8px;border-top:1px solid var(--border);padding-top:8px;}
 .post-label{font-size:11px;color:var(--text3);margin-bottom:6px;}
@@ -165,7 +166,30 @@ canvas{display:block;}
 .tir-stat-val{font-size:20px;font-weight:500;}
 .tir-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:10px;}
 
-/* weekly review */
+/* report preview */
+#report-preview{background:#fff;border-radius:var(--radius);border:1px solid var(--border);padding:16px;font-size:12px;}
+.rp-header{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:8px;}
+.rp-title{font-family:'DM Serif Display',serif;font-size:22px;color:var(--accent);}
+.rp-date{font-size:10px;color:var(--text3);text-align:right;line-height:1.5;}
+.rp-divider{border:none;border-top:1.5px solid var(--accent);margin:0 0 10px;}
+.rp-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-bottom:10px;}
+.rp-tile{border-radius:6px;padding:6px 7px;}
+.rp-tile-label{font-size:7px;font-weight:700;margin-bottom:2px;}
+.rp-tile-val{font-size:16px;font-weight:700;line-height:1;}
+.rp-tile-unit{font-size:7px;margin-top:1px;}
+.rp-section{font-size:9px;font-weight:700;color:var(--accent);margin:10px 0 4px;}
+.rp-tir-bar{display:flex;height:16px;border-radius:3px;overflow:hidden;margin-bottom:3px;}
+.rp-tir-seg{display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:700;color:#fff;}
+.rp-table{width:100%;border-collapse:collapse;font-size:8px;margin-bottom:6px;}
+.rp-table th{background:var(--accent);color:#fff;padding:3px 5px;text-align:left;font-size:7.5px;}
+.rp-table td{padding:3px 5px;border-bottom:1px solid var(--surface2);}
+.rp-table tr:nth-child(even) td{background:var(--surface2);}
+.rp-two-col{display:grid;grid-template-columns:58% 38%;gap:4%;}
+.rp-box{border-radius:6px;padding:7px 9px;margin-bottom:6px;}
+.rp-box-label{font-size:7px;font-weight:700;margin-bottom:3px;}
+.rp-box-val{font-size:15px;font-weight:700;line-height:1;}
+.rp-box-sub{font-size:7px;margin-top:2px;}
+.rp-disclaimer{font-size:7px;color:var(--text3);line-height:1.5;border-top:1px solid var(--border);padding-top:6px;margin-top:8px;}
 .week-toggle{display:flex;gap:6px;margin-bottom:14px;}
 .week-btn{flex:1;padding:8px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);font-size:13px;color:var(--text2);cursor:pointer;font-family:'DM Sans',sans-serif;text-align:center;}
 .week-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
@@ -435,7 +459,6 @@ canvas{display:block;}
     <div class="screen" id="screen-log">
       <div style="display:flex;gap:8px;margin-bottom:10px;">
         <button class="btn-ghost" style="margin-top:0;flex:1;" onclick="exportCSV()">Export CSV</button>
-        <button class="btn-ghost" style="margin-top:0;flex:1;" onclick="exportPDF()">Export PDF report</button>
       </div>
       <div class="log-filter">
         <button class="filter-pill active" data-filter="all">All</button>
@@ -470,6 +493,18 @@ canvas{display:block;}
         Back to Trends
       </button>
       <div id="accuracy-content"></div>
+    </div>
+
+    <div class="screen" id="screen-report">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;">
+        <button class="btn-back" style="margin-bottom:0;" onclick="switchTab('trends',document.querySelectorAll('.tab')[2])">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Back
+        </button>
+        <button class="btn-primary" style="margin:0;padding:10px 18px;font-size:13px;" onclick="exportPDF()">Export PDF →</button>
+      </div>
+      <p style="font-size:11px;color:var(--text3);margin-bottom:12px;">PDF will be saved to your Downloads folder.</p>
+      <div id="report-preview"></div>
     </div>
 
     <!-- SETTINGS -->
@@ -662,6 +697,7 @@ function switchTab(name,el){
   if(name==='trends') renderTrends();
   if(name==='weekly') renderWeekly();
   if(name==='accuracy') renderAccuracy();
+  if(name==='report') renderReportPreview();
   if(name==='settings') loadSettings();
   checkNudge();
 }
@@ -1274,6 +1310,7 @@ function renderTrends(){
 
     <button class="btn-ghost" style="margin-top:0;" onclick="switchTab('weekly',null)">View weekly review →</button>
     <button class="btn-ghost" style="margin-top:4px;" onclick="switchTab('accuracy',null)">View dose accuracy →</button>
+    <button class="btn-ghost" style="margin-top:4px;" onclick="switchTab('report',null)">Preview weekly report →</button>
   `;
   drawChart(chartData);
 }
@@ -1850,6 +1887,125 @@ function renderAccuracy(){
       <p class="card-label">Recent overrides</p>
       ${overrideRows}
     </div>
+  `;
+}
+
+// ── Report Preview ──
+function renderReportPreview(){
+  const el=document.getElementById('report-preview');
+  const doseLogs=log.filter(e=>e.type==='dose');
+  const withPost=doseLogs.filter(e=>e.postBg!==null);
+  const tir=computeTIR(withPost);
+  const hba1c=estimateHbA1c();
+  const fastings=[...doseLogs.filter(e=>e.fasting),...log.filter(e=>e.type==='glucose'&&e.fasting)];
+  const morningFastings=fastings.filter(e=>{const h=new Date(e.ts).getHours();return h>=5&&h<10;});
+  const fastAvg=fastings.length?(fastings.reduce((a,e)=>a+e.bg,0)/fastings.length).toFixed(0):null;
+  const allBg=[...doseLogs.map(e=>e.bg),...log.filter(e=>e.type==='glucose').map(e=>e.bg)];
+  const avgBg=allBg.length?(allBg.reduce((a,b)=>a+b,0)/allBg.length).toFixed(0):null;
+  const suggestions=computeSuggestions();
+  const tolerance=0.5;
+  const calcDoses=doseLogs.filter(e=>e.suggested!=null);
+  const onTarget=calcDoses.filter(e=>Math.abs(e.total-e.suggested)<=tolerance);
+  const pct=calcDoses.length?Math.round(onTarget.length/calcDoses.length*100):null;
+  const avgOverride=calcDoses.length?(calcDoses.reduce((a,e)=>a+(e.total-e.suggested),0)/calcDoses.length):0;
+  const today=new Date().toLocaleDateString('pt-PT',{day:'2-digit',month:'short',year:'numeric'});
+
+  // Tiles
+  const tiles=[
+    {label:'AVG BLOOD GLUCOSE',val:avgBg?`${avgBg} mg/dL`:'—',unit:'',bg:'#e8f5e9',fg:'#2d5a3d'},
+    {label:'EST. HbA1c',val:hba1c?`${hba1c}%`:'—',unit:'estimated',bg:'#e8f5e9',fg:'#2d5a3d'},
+    {label:'TIME IN RANGE',val:tir?`${tir.ok}%`:'—',unit:'of readings',bg:'#fff3e0',fg:'#d4891a'},
+    {label:'TOTAL DOSES',val:`${doseLogs.length}`,unit:'this period',bg:'#edeae3',fg:'#2d5a3d'},
+  ];
+  const tilesHTML=tiles.map(t=>`
+    <div class="rp-tile" style="background:${t.bg};">
+      <div class="rp-tile-label" style="color:${t.fg};">${t.label}</div>
+      <div class="rp-tile-val" style="color:${t.fg};">${t.val}</div>
+      <div class="rp-tile-unit" style="color:${t.fg};">${t.unit}</div>
+    </div>`).join('');
+
+  // TIR bar
+  const tirHTML=tir?`
+    <div class="rp-tir-bar">
+      <div class="rp-tir-seg" style="width:${tir.lo}%;background:#c0392b;">${tir.lo>8?tir.lo+'%':''}</div>
+      <div class="rp-tir-seg" style="width:${tir.ok}%;background:#2d5a3d;">${tir.ok>8?tir.ok+'%':''}</div>
+      <div class="rp-tir-seg" style="width:${tir.hi}%;background:#d4891a;">${tir.hi>8?tir.hi+'%':''}</div>
+    </div>
+    <div style="font-size:7px;color:#888;margin-bottom:6px;">Target: 70–180 mg/dL &nbsp;·&nbsp; ${tir.total} post-meal readings</div>`
+  :'<div style="font-size:8px;color:#888;">Not enough post-meal data yet.</div>';
+
+  // Meal table
+  let mealRows='';
+  for(let i=0;i<6;i++){
+    const ents=doseLogs.filter(e=>e.meal===i);
+    if(!ents.length)continue;
+    const pre=(ents.reduce((a,e)=>a+e.bg,0)/ents.length).toFixed(0);
+    const wp=ents.filter(e=>e.postBg!==null);
+    const post=wp.length?(wp.reduce((a,e)=>a+e.postBg,0)/wp.length).toFixed(0):'—';
+    const dose=(ents.reduce((a,e)=>a+e.total,0)/ents.length).toFixed(1);
+    const mCalc=ents.filter(e=>e.suggested!=null);
+    const acc=mCalc.length?Math.round(mCalc.filter(e=>Math.abs(e.total-e.suggested)<=tolerance).length/mCalc.length*100)+'%':'—';
+    mealRows+=`<tr><td>${MEALS[i]}</td><td>${pre}</td><td>${post}</td><td>${dose} u</td><td>${acc}</td></tr>`;
+  }
+
+  // Ratio suggestions
+  let ratioRows='';
+  MEALS.forEach((m,i)=>{
+    const s=suggestions[i];
+    const cur=settings.ratios[i];
+    const sig=s&&s!==cur?'↑ Adjust':'✓ On track';
+    const sigColor=s&&s!==cur?'#d4891a':'#2d5a3d';
+    ratioRows+=`<tr><td>${m}</td><td>1:${cur}</td><td>${s?'1:'+s:'—'}</td><td>${s?'7 days':'< 5 readings'}</td><td style="color:${sigColor};font-weight:600;">${s?sig:'Insufficient'}</td></tr>`;
+  });
+
+  // Snapshot boxes
+  const fastBox=fastAvg?`
+    <div class="rp-box" style="background:#e8f5e9;">
+      <div class="rp-box-label" style="color:#2d5a3d;">FASTING GLUCOSE</div>
+      <div class="rp-box-val" style="color:#2d5a3d;">${fastAvg} mg/dL</div>
+      <div class="rp-box-sub" style="color:#2d5a3d;">${fastings.length} readings</div>
+    </div>`:'';
+
+  const accBox=pct!==null?`
+    <div class="rp-box" style="background:#edeae3;">
+      <div class="rp-box-label" style="color:#2d5a3d;">DOSE ACCURACY</div>
+      <div class="rp-box-val" style="color:#2d5a3d;">${pct}% on target</div>
+      <div class="rp-box-sub" style="color:${avgOverride>0.1?'#d4891a':avgOverride<-0.1?'#c0392b':'#2d5a3d'};">${avgOverride>=0?'+':''}${avgOverride.toFixed(1)} u avg override</div>
+    </div>`:'';
+
+  el.innerHTML=`
+    <div class="rp-header">
+      <div class="rp-title">Glucus</div>
+      <div class="rp-date">Weekly Report · ${today}<br>Generated by Glucus PWA</div>
+    </div>
+    <hr class="rp-divider">
+
+    <div class="rp-tiles">${tilesHTML}</div>
+
+    <div class="rp-section">Time in Range</div>
+    ${tirHTML}
+
+    <div class="rp-two-col">
+      <div>
+        <div class="rp-section">Per-Meal Averages</div>
+        <table class="rp-table">
+          <thead><tr><th>Meal</th><th>Pre-BG</th><th>Post-BG</th><th>Avg Dose</th><th>Accuracy</th></tr></thead>
+          <tbody>${mealRows||'<tr><td colspan="5" style="color:#888;">No data yet.</td></tr>'}</tbody>
+        </table>
+      </div>
+      <div>
+        <div class="rp-section">Snapshot</div>
+        ${fastBox}${accBox}
+      </div>
+    </div>
+
+    <div class="rp-section">Ratio Suggestions</div>
+    <table class="rp-table">
+      <thead><tr><th>Meal</th><th>Current</th><th>Suggested</th><th>Based on</th><th>Signal</th></tr></thead>
+      <tbody>${ratioRows}</tbody>
+    </table>
+
+    <div class="rp-disclaimer">This report was generated automatically by Glucus. It is intended to support — not replace — your prescribed insulin plan and the guidance of your healthcare team. Always consult your doctor before making any changes to your insulin ratios or correction factors.</div>
   `;
 }
 
