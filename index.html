@@ -132,6 +132,9 @@ html,body{height:100%;background:var(--bg);font-family:'DM Sans',sans-serif;colo
 .badge-low{background:var(--low-light);color:var(--low);}
 .badge-ok{background:var(--ok-light);color:var(--ok);}
 .badge-fasting{background:var(--amber-light);color:var(--amber);}
+.hypo-warning{display:none;background:#fdecea;border:1px solid #c0392b;border-radius:var(--radius-sm);padding:9px 36px 9px 12px;margin-bottom:10px;font-size:12px;color:#c0392b;font-weight:500;line-height:1.5;position:relative;}
+.hypo-warning.show{display:block;}
+.hypo-warning-close{position:absolute;top:50%;right:10px;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:16px;color:#c0392b;opacity:0.5;line-height:1;padding:0;}
 .delete-btn{background:none;border:none;cursor:pointer;color:var(--text3);font-size:18px;padding:0 0 0 8px;line-height:1;}
 .log-empty{text-align:center;padding:48px 20px;color:var(--text3);}
 .log-empty p{font-size:14px;margin-top:8px;}
@@ -166,6 +169,17 @@ canvas{display:block;}
 .week-toggle{display:flex;gap:6px;margin-bottom:14px;}
 .week-btn{flex:1;padding:8px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);font-size:13px;color:var(--text2);cursor:pointer;font-family:'DM Sans',sans-serif;text-align:center;}
 .week-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.acc-row{display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border);}
+.acc-row:last-child{border-bottom:none;}
+.acc-meal{font-size:14px;color:var(--text);font-weight:500;}
+.acc-meta{font-size:11px;color:var(--text3);margin-top:2px;}
+.acc-pills{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;}
+.acc-pill{font-size:11px;font-weight:600;padding:3px 8px;border-radius:10px;}
+.acc-pill.on{background:var(--accent-light);color:var(--accent);}
+.acc-pill.over{background:#fff3e0;color:var(--amber);}
+.acc-pill.under{background:#fdecea;color:#c0392b;}
+.acc-bar-wrap{height:6px;border-radius:3px;background:var(--surface2);overflow:hidden;margin-top:6px;}
+.acc-bar{height:100%;border-radius:3px;background:var(--accent);transition:width 0.4s;}
 .week-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px;}
 .week-stat{background:var(--surface2);border-radius:var(--radius-sm);padding:12px;}
 .week-stat-val{font-size:24px;font-weight:500;color:var(--text);}
@@ -240,10 +254,16 @@ canvas{display:block;}
 .fm-suggestion-label{font-size:12px;color:var(--accent);font-weight:500;}
 .fm-suggestion-val{font-family:'DM Serif Display',serif;font-size:26px;color:var(--accent);line-height:1;}
 .fm-suggestion-sub{font-size:11px;color:var(--accent);opacity:0.7;}
+.fm-confidence{display:inline-block;font-size:10px;font-weight:600;padding:2px 7px;border-radius:10px;margin-top:3px;}
+.fm-confidence.low{background:#fff3e0;color:var(--amber);}
+.fm-confidence.med{background:var(--accent-light);color:var(--accent);}
+.fm-confidence.high{background:var(--accent);color:#fff;}
 .fm-empty{font-size:12px;color:var(--text3);padding:8px 4px;font-style:italic;}
 .fm-warning{font-size:11px;color:var(--amber);padding:4px 0 0;}
 .note-edit-btn{background:none;border:none;cursor:pointer;font-size:11px;color:var(--text3);padding:2px 0 0;font-family:'DM Sans',sans-serif;text-decoration:underline;}
 </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 </head>
 <body>
 <div id="app">
@@ -349,6 +369,7 @@ canvas{display:block;}
             <div>
               <div class="fm-suggestion-label">🧠 Food Memory suggestion</div>
               <div class="fm-suggestion-sub" id="fm-suggestion-sub"></div>
+              <div id="fm-confidence"></div>
             </div>
             <div style="text-align:right;">
               <div class="fm-suggestion-val" id="fm-suggestion-val">—</div>
@@ -369,6 +390,7 @@ canvas{display:block;}
           <label>Fasting reading</label>
           <div class="toggle" id="fasting-toggle" onclick="this.classList.toggle('on')"></div>
         </div>
+        <div class="hypo-warning" id="hypo-warning">⚠️ Your BG is below 70 mg/dL — treat the low first and recheck before dosing.<button class="hypo-warning-close" onclick="document.getElementById('hypo-warning').classList.remove('show')">&#215;</button></div>
         <button class="btn-primary" id="btn-calculate" onclick="calculate()">Calculate dose</button>
         <button class="btn-sec" id="btn-manual-mode" style="display:none;" onclick="openManualDose()">Log dose manually</button>
         <button class="btn-sec" onclick="openGlucoseModal()">Log glucose only</button>
@@ -413,6 +435,7 @@ canvas{display:block;}
     <div class="screen" id="screen-log">
       <div style="display:flex;gap:8px;margin-bottom:10px;">
         <button class="btn-ghost" style="margin-top:0;flex:1;" onclick="exportCSV()">Export CSV</button>
+        <button class="btn-ghost" style="margin-top:0;flex:1;" onclick="exportPDF()">Export PDF report</button>
       </div>
       <div class="log-filter">
         <button class="filter-pill active" data-filter="all">All</button>
@@ -439,6 +462,14 @@ canvas{display:block;}
         Back to Trends
       </button>
       <div id="weekly-content"></div>
+    </div>
+
+    <div class="screen" id="screen-accuracy">
+      <button class="btn-back" onclick="switchTab('trends',document.querySelectorAll('.tab')[2])">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+        Back to Trends
+      </button>
+      <div id="accuracy-content"></div>
     </div>
 
     <!-- SETTINGS -->
@@ -630,6 +661,7 @@ function switchTab(name,el){
   if(name==='log') renderLog();
   if(name==='trends') renderTrends();
   if(name==='weekly') renderWeekly();
+  if(name==='accuracy') renderAccuracy();
   if(name==='settings') loadSettings();
   checkNudge();
 }
@@ -902,7 +934,7 @@ function renderLog(){
       <div class="log-stats">
         <div class="log-stat"><div class="log-stat-val">${e.bg}</div><div class="log-stat-lbl">Pre BG mg/dL</div></div>
         <div class="log-stat"><div class="log-stat-val">${e.noCarbs?'—':e.carbs+'g'}</div><div class="log-stat-lbl">${e.noCarbs?'No carbs':'Carbs'}</div></div>
-        <div class="log-stat log-dose"><div class="log-stat-val">${e.total} u</div><div class="log-stat-lbl">Actual dose</div></div>
+        <div class="log-stat log-dose"><div class="log-stat-val">${e.total} u</div><div class="log-stat-lbl">Actual dose</div>${e.suggested!=null?`<div class="log-suggested">suggested ${e.suggested} u</div>`:''}</div>
       </div>${postSection}
     </div>`;
   }).join('');
@@ -930,6 +962,179 @@ function exportCSV(){
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');a.href=url;a.download='insulacalc_export.csv';a.click();
   URL.revokeObjectURL(url);showToast('CSV exported');
+}
+
+function exportPDF(){
+  if(typeof window.jspdf==='undefined'){showToast('PDF library not loaded — check connection');return;}
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+
+  const ACC   =[45,90,61];
+  const AMBER =[212,137,26];
+  const RED   =[192,57,43];
+  const SURF  =[237,234,227];
+  const TEXT3 =[136,136,136];
+  const WHITE =[255,255,255];
+  const GREENL=[232,245,233];
+  const AMBERL=[255,243,224];
+
+  const doseLogs=log.filter(e=>e.type==='dose');
+  const withPost=doseLogs.filter(e=>e.postBg!==null);
+  const tir=computeTIR(withPost);
+  const hba1c=estimateHbA1c();
+  const fastings=[...doseLogs.filter(e=>e.fasting),...log.filter(e=>e.type==='glucose'&&e.fasting)];
+  const fastAvg=fastings.length?(fastings.reduce((a,e)=>a+e.bg,0)/fastings.length).toFixed(0):null;
+  const allBg=[...doseLogs.map(e=>e.bg),...log.filter(e=>e.type==='glucose').map(e=>e.bg)];
+  const avgBg=allBg.length?(allBg.reduce((a,b)=>a+b,0)/allBg.length).toFixed(0):null;
+  const suggestions=computeSuggestions();
+
+  const tolerance=0.5;
+  const calcDoses=doseLogs.filter(e=>e.suggested!=null);
+  const onTarget=calcDoses.filter(e=>Math.abs(e.total-e.suggested)<=tolerance);
+  const pct=calcDoses.length?Math.round(onTarget.length/calcDoses.length*100):null;
+  const avgOverride=calcDoses.length?(calcDoses.reduce((a,e)=>a+(e.total-e.suggested),0)/calcDoses.length).toFixed(1):null;
+
+  const today=new Date().toLocaleDateString('pt-PT',{day:'2-digit',month:'short',year:'numeric'});
+  const LM=14,RM=14,TM=10;
+  const PW=210-LM-RM;
+  let y=TM;
+
+  // Header
+  doc.setFont('helvetica','bold');
+  doc.setFontSize(20);doc.setTextColor(...ACC);
+  doc.text('Glucus',LM,y+7);
+  doc.setFont('helvetica','normal');
+  doc.setFontSize(9);doc.setTextColor(...TEXT3);
+  doc.text(`Weekly Report  ·  ${today}`,210-RM,y+4,{align:'right'});
+  doc.text('Generated by Glucus PWA  ·  Data stored locally on your device',210-RM,y+9,{align:'right'});
+  y+=13;
+  doc.setDrawColor(...ACC);doc.setLineWidth(0.4);doc.line(LM,y,210-RM,y);
+  y+=5;
+
+  // Summary tiles
+  const tileW=PW/4-1;
+  const tiles=[
+    {label:'AVG BLOOD GLUCOSE',val:avgBg?`${avgBg} mg/dL`:'—',bg:GREENL,fg:ACC},
+    {label:'EST. HbA1c',val:hba1c?`${hba1c}%`:'—',bg:GREENL,fg:ACC},
+    {label:'TIME IN RANGE',val:tir?`${tir.ok}%`:'—',bg:AMBERL,fg:AMBER},
+    {label:'TOTAL DOSES',val:`${doseLogs.length}`,bg:SURF,fg:ACC},
+  ];
+  tiles.forEach((t,i)=>{
+    const tx=LM+i*(tileW+1.3);
+    doc.setFillColor(...t.bg);doc.roundedRect(tx,y,tileW,16,1.5,1.5,'F');
+    doc.setFont('helvetica','bold');doc.setFontSize(6.5);doc.setTextColor(...t.fg);
+    doc.text(t.label,tx+3,y+4);
+    doc.setFontSize(15);doc.text(t.val,tx+3,y+12);
+  });
+  y+=20;
+
+  // Time in range bar
+  doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(...ACC);
+  doc.text('Time in Range',LM,y);y+=3;
+  if(tir){
+    const barH=5;
+    const loW=PW*(tir.lo/100),okW=PW*(tir.ok/100),hiW=PW*(tir.hi/100);
+    doc.setFillColor(...RED);doc.rect(LM,y,loW,barH,'F');
+    doc.setFillColor(...ACC);doc.rect(LM+loW,y,okW,barH,'F');
+    doc.setFillColor(...AMBER);doc.rect(LM+loW+okW,y,hiW,barH,'F');
+    doc.setFont('helvetica','bold');doc.setFontSize(7);doc.setTextColor(...WHITE);
+    if(tir.lo>8)doc.text(`${tir.lo}%`,LM+loW/2,y+3.5,{align:'center'});
+    if(tir.ok>8)doc.text(`${tir.ok}%`,LM+loW+okW/2,y+3.5,{align:'center'});
+    if(tir.hi>8)doc.text(`${tir.hi}%`,LM+loW+okW+hiW/2,y+3.5,{align:'center'});
+    y+=barH+2;
+    doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(...TEXT3);
+    doc.text('Target range: 70–180 mg/dL',LM,y);y+=5;
+  } else {y+=5;}
+
+  // Two columns: meal table + snapshot
+  const LCW=PW*0.58, RCW=PW*0.38, GAP=PW*0.04;
+  const colY=y;
+
+  // Meal table
+  doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(...ACC);
+  doc.text('Per-Meal Averages',LM,y);y+=2;
+  const mealHead=[['Meal','Pre-BG','Post-BG','Avg Dose','Accuracy']];
+  const mealBody=[];
+  for(let i=0;i<6;i++){
+    const ents=doseLogs.filter(e=>e.meal===i);
+    if(!ents.length)continue;
+    const pre=(ents.reduce((a,e)=>a+e.bg,0)/ents.length).toFixed(0);
+    const wp=ents.filter(e=>e.postBg!==null);
+    const post=wp.length?(wp.reduce((a,e)=>a+e.postBg,0)/wp.length).toFixed(0):'—';
+    const dose=(ents.reduce((a,e)=>a+e.total,0)/ents.length).toFixed(1);
+    const mCalc=ents.filter(e=>e.suggested!=null);
+    const acc=mCalc.length?Math.round(mCalc.filter(e=>Math.abs(e.total-e.suggested)<=tolerance).length/mCalc.length*100)+'%':'—';
+    mealBody.push([MEALS[i],`${pre}`,`${post}`,`${dose} u`,acc]);
+  }
+  doc.autoTable({
+    head:mealHead,body:mealBody,
+    startY:y+1,margin:{left:LM},
+    tableWidth:LCW,
+    styles:{fontSize:7,cellPadding:2},
+    headStyles:{fillColor:ACC,textColor:WHITE,fontStyle:'bold'},
+    alternateRowStyles:{fillColor:SURF},
+    theme:'plain',
+  });
+  const afterMeal=doc.lastAutoTable.finalY+3;
+
+  // Right column — snapshot boxes
+  const rx=LM+LCW+GAP;
+  let ry=colY;
+
+  // Fasting box
+  if(fastAvg){
+    doc.setFillColor(...GREENL);doc.roundedRect(rx,ry,RCW,18,1.5,1.5,'F');
+    doc.setFont('helvetica','bold');doc.setFontSize(6.5);doc.setTextColor(...ACC);
+    doc.text('FASTING GLUCOSE',rx+3,ry+4);
+    doc.setFontSize(14);doc.text(`${fastAvg} mg/dL`,rx+3,ry+13);
+    doc.setFont('helvetica','normal');doc.setFontSize(6.5);doc.setTextColor(...TEXT3);
+    doc.text(`${fastings.length} readings`,rx+3,ry+17);
+    ry+=21;
+  }
+
+  // Accuracy box
+  if(pct!==null){
+    doc.setFillColor(...SURF);doc.roundedRect(rx,ry,RCW,18,1.5,1.5,'F');
+    doc.setFont('helvetica','bold');doc.setFontSize(6.5);doc.setTextColor(...ACC);
+    doc.text('DOSE ACCURACY',rx+3,ry+4);
+    doc.setFontSize(14);doc.text(`${pct}% on target`,rx+3,ry+13);
+    doc.setFont('helvetica','normal');doc.setFontSize(6.5);doc.setTextColor(...TEXT3);
+    const dir=parseFloat(avgOverride)>=0?`+${avgOverride} u avg override`:`${avgOverride} u avg override`;
+    doc.text(dir,rx+3,ry+17);
+    ry+=21;
+  }
+
+  y=Math.max(afterMeal,ry)+3;
+
+  // Ratio suggestions
+  doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(...ACC);
+  doc.text('Ratio Suggestions',LM,y);y+=2;
+  const ratioHead=[['Meal','Current','Suggested','Based on','Signal']];
+  const ratioBody=MEALS.map((m,i)=>{
+    const s=suggestions[i];
+    const cur=`1:${settings.ratios[i]}`;
+    if(!s)return[m,cur,'—','< 5 readings','Insufficient'];
+    const changed=s!==settings.ratios[i];
+    return[m,cur,`1:${s}`,'7 days',changed?'↑ Adjust':'✓ On track'];
+  });
+  doc.autoTable({
+    head:ratioHead,body:ratioBody,
+    startY:y+1,margin:{left:LM},
+    tableWidth:PW,
+    styles:{fontSize:7,cellPadding:2},
+    headStyles:{fillColor:ACC,textColor:WHITE,fontStyle:'bold'},
+    alternateRowStyles:{fillColor:SURF},
+    theme:'plain',
+  });
+  y=doc.lastAutoTable.finalY+5;
+
+  // Disclaimer
+  doc.setDrawColor(...SURF);doc.setLineWidth(0.3);doc.line(LM,y,210-RM,y);y+=3;
+  doc.setFont('helvetica','normal');doc.setFontSize(6.5);doc.setTextColor(...TEXT3);
+  doc.text('This report was generated automatically by Glucus. It is intended to support — not replace — your prescribed insulin plan and the guidance of your healthcare team.',LM,y,{maxWidth:PW});
+
+  doc.save(`glucus_report_${new Date().toISOString().slice(0,10)}.pdf`);
+  showToast('PDF report exported');
 }
 
 // ── Ratio suggestions (weighted, min 5) ──
@@ -1008,11 +1213,30 @@ function renderTrends(){
   const fastings=[...doseLogs.filter(e=>e.fasting),...log.filter(e=>e.type==='glucose'&&e.fasting)];
   const fastAvg=fastings.length?(fastings.reduce((a,e)=>a+e.bg,0)/fastings.length).toFixed(0):null;
 
+  // Dawn phenomenon: only morning fasting entries (5am–10am)
+  const morningFastings=fastings.filter(e=>{
+    const h=new Date(e.ts).getHours();
+    return h>=5&&h<10;
+  });
+  const morningAvg=morningFastings.length
+    ? (morningFastings.reduce((a,e)=>a+e.bg,0)/morningFastings.length)
+    : null;
+  const dawnFlag=morningAvg!==null&&morningAvg>settings.target+20&&morningFastings.length>=3;
+
   el.innerHTML=`
     <div class="card">
       <p class="card-label">Per-meal averages — pre · post</p>
       ${mealRows||'<p style="font-size:14px;color:var(--text3);">No dose data yet.</p>'}
-      ${fastAvg?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;"><span style="font-size:14px;color:var(--text);">Avg fasting BG</span><span class="mav-pill mav-pre">${fastAvg}</span></div>`:''}
+      ${fastAvg?`<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <span style="font-size:14px;color:var(--text);">Avg fasting BG</span>
+          <span class="mav-pill mav-pre">${fastAvg}</span>
+        </div>
+        ${dawnFlag?`<div style="margin-top:8px;padding:8px 10px;background:#fff3e0;border-radius:var(--radius-sm);border-left:3px solid var(--amber);">
+          <div style="font-size:12px;font-weight:600;color:var(--amber);margin-bottom:2px;">⚠️ Possible dawn phenomenon</div>
+          <div style="font-size:11px;color:var(--text2);line-height:1.5;">Morning fasting BG averaging ${morningAvg.toFixed(0)} mg/dL across ${morningFastings.length} readings — consistently above target. Worth discussing with your doctor.</div>
+        </div>`:''}
+      </div>`:''}
     </div>
 
     ${tir?`<div class="card">
@@ -1049,6 +1273,7 @@ function renderTrends(){
     </div>
 
     <button class="btn-ghost" style="margin-top:0;" onclick="switchTab('weekly',null)">View weekly review →</button>
+    <button class="btn-ghost" style="margin-top:4px;" onclick="switchTab('accuracy',null)">View dose accuracy →</button>
   `;
   drawChart(chartData);
 }
@@ -1394,7 +1619,7 @@ function renderFMMatches(){
     return`<div class="fm-match ${sel}" onclick="fmToggleMatch(${e.id})" data-id="${e.id}">
       <div class="fm-match-left">
         <div class="fm-match-note">${e.note}</div>
-        <div class="fm-match-meta">${MEALS[e.meal]} · ${dateStr} · pre ${e.bg} mg/dL</div>
+        <div class="fm-match-meta">${MEALS[e.meal]} · ${dateStr} · pre ${e.bg} mg/dL${e.manualDose?' · <span style="color:var(--text3);">✏️ manual</span>':''}</div>
       </div>
       <div class="fm-match-right">
         <div class="fm-match-dose">${e.total}u taken</div>
@@ -1432,7 +1657,7 @@ function updateFMSuggestion(){
   const now=Date.now();
 
   // Compute weighted average net food dose
-  // Weight = recency * outcome quality (if postBg available)
+  // Weight = recency * outcome quality * manual confidence penalty
   let totalWeight=0, weightedDose=0;
   pool.forEach(e=>{
     const ageDays=(now-new Date(e.ts).getTime())/(24*60*60*1000);
@@ -1443,7 +1668,8 @@ function updateFMSuggestion(){
       const delta=Math.abs(e.postBg-settings.target);
       outcomeW=Math.max(0.1,1-(delta/150));
     }
-    const w=recencyW*outcomeW;
+    const manualPenalty=e.manualDose?0.5:1.0;
+    const w=recencyW*outcomeW*manualPenalty;
     const netFood=Math.max(0,e.total-(e.corrDose||0));
     weightedDose+=netFood*w;
     totalWeight+=w;
@@ -1452,6 +1678,16 @@ function updateFMSuggestion(){
   const netFoodDose=totalWeight>0?weightedDose/totalWeight:0;
   valEl.textContent=netFoodDose.toFixed(1)+'u';
   subEl.textContent=`from ${pool.length} match${pool.length>1?'es':''}${fmSelected.size>0?' (selected)':' (tap to select)'}`;
+
+  // Confidence badge
+  const confEl=document.getElementById('fm-confidence');
+  const withPostCount=withPost.length;
+  let confClass, confLabel;
+  if(withPostCount>=5){confClass='high';confLabel=`Strong — ${withPostCount} outcomes`;}
+  else if(withPostCount>=2){confClass='med';confLabel=`Moderate — ${withPostCount} outcomes`;}
+  else{confClass='low';confLabel=`Low — ${withPostCount} outcome${withPostCount===1?'':'s'} with post-BG`;}
+  confEl.innerHTML=`<span class="fm-confidence ${confClass}">${confLabel}</span>`;
+
   suggEl.style.display='flex';
 
   // Warning if fewer than 2 entries have postBg
@@ -1470,7 +1706,8 @@ function getFMNetFoodDose(){
     const recencyW=Math.max(0.1,1-(ageDays/90)*0.9);
     let outcomeW=0.5;
     if(e.postBg!==null){const delta=Math.abs(e.postBg-settings.target);outcomeW=Math.max(0.1,1-(delta/150));}
-    const w=recencyW*outcomeW;
+    const manualPenalty=e.manualDose?0.5:1.0;
+    const w=recencyW*outcomeW*manualPenalty;
     weightedDose+=Math.max(0,e.total-(e.corrDose||0))*w;
     totalWeight+=w;
   });
@@ -1484,6 +1721,11 @@ function isFMActive(){
 }
 
 // Wire up note field with debounce
+document.getElementById('c-bg').addEventListener('input',()=>{
+  const bg=parseFloat(document.getElementById('c-bg').value);
+  const warn=document.getElementById('hypo-warning');
+  warn.classList.toggle('show', !isNaN(bg) && bg < 70);
+});
 document.getElementById('c-note').addEventListener('input',()=>{
   clearTimeout(fmDebounce);
   fmDebounce=setTimeout(fmSearch,350);
@@ -1518,6 +1760,97 @@ function saveNoteEdit(){
   entry.note=document.getElementById('note-edit-input').value.trim();
   saveLS();closeNoteEditModal();renderLog();
   showToast('Note updated');
+}
+
+// ── Dose Accuracy Screen ──
+function renderAccuracy(){
+  const el=document.getElementById('accuracy-content');
+  const doseLogs=log.filter(e=>e.type==='dose'&&e.suggested!=null&&e.total!=null);
+  if(doseLogs.length<3){
+    el.innerHTML='<div class="card"><p style="font-size:14px;color:var(--text3);">Log a few more doses to see accuracy trends.</p></div>';
+    return;
+  }
+
+  // Overall stats
+  const tolerance=0.5;
+  const onTarget=doseLogs.filter(e=>Math.abs(e.total-e.suggested)<=tolerance);
+  const over=doseLogs.filter(e=>e.total-e.suggested>tolerance);
+  const under=doseLogs.filter(e=>e.suggested-e.total>tolerance);
+  const pct=Math.round(onTarget.length/doseLogs.length*100);
+  const avgOverride=doseLogs.reduce((a,e)=>a+(e.total-e.suggested),0)/doseLogs.length;
+
+  // Per-meal breakdown
+  let mealRows='';
+  for(let i=0;i<6;i++){
+    const entries=doseLogs.filter(e=>e.meal===i);
+    if(!entries.length) continue;
+    const mOn=entries.filter(e=>Math.abs(e.total-e.suggested)<=tolerance);
+    const mOver=entries.filter(e=>e.total-e.suggested>tolerance);
+    const mUnder=entries.filter(e=>e.suggested-e.total>tolerance);
+    const mPct=Math.round(mOn.length/entries.length*100);
+    const mAvg=(entries.reduce((a,e)=>a+(e.total-e.suggested),0)/entries.length);
+    const dir=mAvg>0.1?`+${mAvg.toFixed(1)} u avg`:mAvg<-0.1?`${mAvg.toFixed(1)} u avg`:'on target avg';
+    const dirColor=mAvg>0.1?'color:var(--amber);':mAvg<-0.1?'color:#c0392b;':'color:var(--accent);';
+    mealRows+=`<div class="acc-row">
+      <div>
+        <div class="acc-meal">${MEALS[i]}</div>
+        <div class="acc-meta">${entries.length} doses · <span style="${dirColor}font-weight:500;">${dir}</span></div>
+        <div class="acc-bar-wrap" style="width:120px;margin-top:6px;">
+          <div class="acc-bar" style="width:${mPct}%;"></div>
+        </div>
+      </div>
+      <div class="acc-pills">
+        <span class="acc-pill on">${mPct}% on target</span>
+        ${mOver.length?`<span class="acc-pill over">↑ ${mOver.length}×</span>`:''}
+        ${mUnder.length?`<span class="acc-pill under">↓ ${mUnder.length}×</span>`:''}
+      </div>
+    </div>`;
+  }
+
+  // Recent overrides list (last 5 where actual ≠ suggested)
+  const overrides=doseLogs.filter(e=>Math.abs(e.total-e.suggested)>tolerance).slice(0,5);
+  const overrideRows=overrides.length?overrides.map(e=>{
+    const d=new Date(e.ts).toLocaleDateString('pt-PT',{day:'2-digit',month:'short'});
+    const diff=e.total-e.suggested;
+    const col=diff>0?'color:var(--amber);':'color:#c0392b;';
+    return`<div class="acc-row">
+      <div>
+        <div class="acc-meal">${MEALS[e.meal]} <span style="font-size:11px;color:var(--text3);">${d}</span></div>
+        ${e.note?`<div class="acc-meta">${e.note}</div>`:''}
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:13px;font-weight:600;${col}">${diff>0?'+':''}${diff.toFixed(1)} u</div>
+        <div style="font-size:11px;color:var(--text3);">suggested ${e.suggested} u → took ${e.total} u</div>
+      </div>
+    </div>`;
+  }).join(''):'<p style="font-size:13px;color:var(--text3);">No overrides — you\'ve been following suggestions closely.</p>';
+
+  el.innerHTML=`
+    <div class="card">
+      <p class="card-label">Overall accuracy</p>
+      <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:4px;">
+        <span style="font-family:'DM Serif Display',serif;font-size:40px;color:var(--accent);">${pct}%</span>
+        <span style="font-size:13px;color:var(--text3);">on target (±0.5 u)</span>
+      </div>
+      <div style="display:flex;gap:10px;margin-bottom:10px;">
+        <span class="acc-pill on">${onTarget.length} on target</span>
+        <span class="acc-pill over">${over.length} over</span>
+        <span class="acc-pill under">${under.length} under</span>
+      </div>
+      <div style="font-size:13px;color:var(--text2);">Average override: <b style="${avgOverride>0.1?'color:var(--amber);':avgOverride<-0.1?'color:#c0392b;':'color:var(--accent);'}">${avgOverride>=0?'+':''}${avgOverride.toFixed(1)} u</b></div>
+      <p style="font-size:11px;color:var(--text3);margin-top:6px;">Based on ${doseLogs.length} calculated doses. Manual entries excluded.</p>
+    </div>
+
+    <div class="card">
+      <p class="card-label">Per-meal breakdown</p>
+      ${mealRows||'<p style="font-size:13px;color:var(--text3);">No data yet.</p>'}
+    </div>
+
+    <div class="card">
+      <p class="card-label">Recent overrides</p>
+      ${overrideRows}
+    </div>
+  `;
 }
 
 // ── Init ──
