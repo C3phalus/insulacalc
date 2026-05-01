@@ -240,7 +240,10 @@ canvas{display:block;}
 .ratio-row input{width:60px;text-align:center;border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 4px;font-size:15px;font-family:'DM Sans',sans-serif;background:var(--surface2);color:var(--text);appearance:none;}
 .ratio-row input:focus{outline:none;border-color:var(--accent);}
 .unit-tag{font-size:12px;color:var(--text3);margin-left:6px;min-width:52px;}
-.suggestion-tag{font-size:11px;color:var(--amber);background:var(--amber-light);padding:2px 7px;border-radius:10px;white-space:nowrap;display:inline-block;margin-top:3px;}
+.suggestion-tag{font-size:11px;padding:2px 7px;border-radius:10px;white-space:nowrap;display:inline-block;margin-top:3px;font-weight:500;}
+.suggestion-tag.low{color:#c0392b;background:#fdecea;}
+.suggestion-tag.med{color:var(--amber);background:var(--amber-light);}
+.suggestion-tag.high{color:#2d5a3d;background:#e8f5e9;}
 .save-btn{width:100%;padding:13px;font-size:15px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;border-radius:var(--radius-sm);border:1px solid var(--accent);background:transparent;color:var(--accent);margin-top:4px;transition:all 0.15s;}
 .save-btn:active{background:var(--accent);color:#fff;}
 .trend-multiplier-row{display:flex;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);}
@@ -511,7 +514,7 @@ canvas{display:block;}
     <div class="screen" id="screen-settings">
       <div class="card">
         <p class="card-label">Insulin-to-carb ratios</p>
-        <p style="font-size:12px;color:var(--text3);margin-bottom:12px;">Current · 7-day suggestion (min. 5 paired readings, weighted by recency)</p>
+        <p style="font-size:12px;color:var(--text3);margin-bottom:12px;">Current · 14-day suggestion (min. 5 days with paired readings, weighted by recency)</p>
         <div id="ratio-rows"></div>
       </div>
       <div class="card">
@@ -1159,9 +1162,8 @@ function exportPDF(){
   const ratioBody=MEALS.map((m,i)=>{
     const s=suggestions[i];
     const cur=`1:${settings.ratios[i]}`;
-    if(!s)return[m,cur,'—','< 5 readings','Insufficient'];
-    const changed=s!==settings.ratios[i];
-    return[m,cur,`1:${s}`,'7 days',changed?'↑ Adjust':'✓ On track'];
+    if(!s)return[m,cur,'—','Insufficient data','—'];
+    return[m,cur,`1:${s.value}`,`${s.days} days`,s.confidence==='high'?'✓ Strong':s.confidence==='med'?'↑ Adjust':'⚠ Low data'];
   });
   doc.autoTable({
     head:ratioHead,body:ratioBody,
@@ -1185,17 +1187,27 @@ function exportPDF(){
 
 // ── Ratio suggestions (weighted, min 5) ──
 function computeSuggestions(){
-  const sevenDays=Date.now()-7*24*60*60*1000;
-  const cutoff=Math.max(sevenDays,suggestResetTs);
+  const fourteenDays=Date.now()-14*24*60*60*1000;
+  const cutoff=Math.max(fourteenDays,suggestResetTs);
   return MEALS.map((_,i)=>{
-    const entries=log.filter(e=>e.type==='dose'&&e.meal===i&&e.postBg!==null&&new Date(e.ts).getTime()>cutoff);
-    if(entries.length<5)return null;
-    // weight by recency: newer = higher weight
+    const isAfternoon=i===3; // Afternoon snack index
+    const minDays=isAfternoon?4:5;
+
+    const entries=log.filter(e=>
+      e.type==='dose'&&e.meal===i&&e.postBg!==null&&
+      new Date(e.ts).getTime()>cutoff
+    );
+
+    // Count unique calendar days
+    const uniqueDays=new Set(entries.map(e=>new Date(e.ts).toDateString())).size;
+    if(uniqueDays<minDays) return null;
+
+    // Weight by recency — newer = higher weight, decays over 14 days
     const now=Date.now();
     let weightedPost=0,totalWeight=0;
     entries.forEach(e=>{
       const ageDays=(now-new Date(e.ts).getTime())/(24*60*60*1000);
-      const weight=Math.max(0.2,1-(ageDays/7)*0.8); // 1.0 today → 0.2 at 7 days
+      const weight=Math.max(0.1,1-(ageDays/14)*0.9);
       weightedPost+=e.postBg*weight;
       totalWeight+=weight;
     });
@@ -1203,7 +1215,15 @@ function computeSuggestions(){
     const factor=avgPost/settings.target;
     const suggested=Math.round(settings.ratios[i]/factor);
     const clamped=Math.min(50,Math.max(3,suggested));
-    return clamped===settings.ratios[i]?null:clamped;
+    if(clamped===settings.ratios[i]) return null;
+
+    // Confidence level based on unique days
+    let confidence;
+    if(uniqueDays<5) confidence='low';
+    else if(uniqueDays<10) confidence='med';
+    else confidence='high';
+
+    return{value:clamped,days:uniqueDays,confidence};
   });
 }
 
@@ -1248,7 +1268,7 @@ function renderTrends(){
     if(avgPost){const c=getBgColor(parseFloat(avgPost),settings.target);postPill=`<span class="mav-pill" style="background:${c.bg};color:${c.fg};">${avgPost}</span>`;}
     const sug=suggestions[i];
     mealRows+=`<div class="meal-avg-row">
-      <div class="mav-left"><div class="mav-name">${MEALS[i]}</div><div class="mav-meta">avg ${avgDose} u · ${entries.length} entries</div>${sug?`<div class="suggest-pill">Suggest: ${sug} g/u</div>`:''}</div>
+      <div class="mav-left"><div class="mav-name">${MEALS[i]}</div><div class="mav-meta">avg ${avgDose} u · ${entries.length} entries</div>${sug?`<div class="suggestion-tag ${sug.confidence}">Suggest: ${sug.value} g/u · ${sug.days}d</div>`:''}</div>
       <div class="mav-pills"><span class="mav-pill mav-pre">${avgPre}</span>${postPill}</div>
     </div>`;
   }
@@ -1480,7 +1500,7 @@ function loadSettings(){
   const suggestions=computeSuggestions();
   container.innerHTML=MEALS.map((name,i)=>`
     <div class="ratio-row">
-      <div class="ratio-name"><div>${name}</div>${suggestions[i]?`<div class="suggestion-tag">Suggest: ${suggestions[i]} g/u</div>`:''}</div>
+      <div class="ratio-name"><div>${name}</div>${suggestions[i]?`<div class="suggestion-tag ${suggestions[i].confidence}">Suggest: ${suggestions[i].value} g/u · ${suggestions[i].days}d</div>`:''}</div>
       <input type="number" id="s-r${i}" value="${settings.ratios[i]}" min="1" max="100">
       <span class="unit-tag">g / unit</span>
     </div>`).join('');
@@ -1989,9 +2009,9 @@ function renderReportPreview(){
   MEALS.forEach((m,i)=>{
     const s=suggestions[i];
     const cur=settings.ratios[i];
-    const sig=s&&s!==cur?'↑ Adjust':'✓ On track';
-    const sigColor=s&&s!==cur?'#d4891a':'#2d5a3d';
-    ratioRows+=`<tr><td>${m}</td><td>1:${cur}</td><td>${s?'1:'+s:'—'}</td><td>${s?'7 days':'< 5 readings'}</td><td style="color:${sigColor};font-weight:600;">${s?sig:'Insufficient'}</td></tr>`;
+    const sigColor=s?s.confidence==='high'?'#2d5a3d':s.confidence==='med'?'#d4891a':'#c0392b':'#888';
+    const sigLabel=s?s.confidence==='high'?'✓ Strong':s.confidence==='med'?'↑ Adjust':'⚠ Low data':'Insufficient';
+    ratioRows+=`<tr><td>${m}</td><td>1:${cur}</td><td>${s?'1:'+s.value:'—'}</td><td>${s?s.days+' days':'—'}</td><td style="color:${sigColor};font-weight:600;">${sigLabel}</td></tr>`;
   });
 
   // Snapshot boxes
