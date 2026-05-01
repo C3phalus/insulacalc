@@ -120,7 +120,7 @@ html,body{height:100%;background:var(--bg);font-family:'DM Sans',sans-serif;colo
 .log-stat-val{font-size:16px;font-weight:500;color:var(--text);}
 .log-stat-lbl{font-size:10px;color:var(--text3);margin-top:1px;}
 .log-dose{background:var(--accent-light);}.log-dose .log-stat-val{color:var(--accent);}
-.log-suggested{font-size:10px;color:var(--text3);margin-top:2px;}
+.log-suggested{font-size:10px!important;color:var(--text3)!important;margin-top:2px;font-weight:400!important;line-height:1.3;}
 .log-note{font-size:12px;color:var(--text2);margin-top:8px;font-style:italic;}
 .post-row{margin-top:8px;border-top:1px solid var(--border);padding-top:8px;}
 .post-label{font-size:11px;color:var(--text3);margin-bottom:6px;}
@@ -582,6 +582,16 @@ canvas{display:block;}
     </div>
   </div>
 
+  <!-- MEAL EDIT MODAL -->
+  <div class="modal-wrap" id="meal-edit-modal">
+    <div class="modal">
+      <button class="modal-close" onclick="closeMealEditModal()">&#215;</button>
+      <div class="modal-title">Change meal type</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px;" id="meal-edit-options"></div>
+      <button class="btn-ghost" onclick="closeMealEditModal()">Cancel</button>
+    </div>
+  </div>
+
   <div id="tabbar">
     <button class="tab active" onclick="switchTab('calc',this)">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="15" x2="12" y2="15"/></svg>
@@ -964,7 +974,7 @@ function renderLog(){
           </div></div>`;
     return`<div class="log-entry">
       <div class="log-header">
-        <div><div class="log-meal">${MEALS[e.meal]} ${trendStr?`<span style="font-size:14px;">${trendStr}</span>`:''}${e.noCarbs?'<span class="status-badge" style="background:var(--amber-light);color:var(--amber);">🍽️ No carbs</span>':''}${e.foodMemory?'<span class="status-badge" style="background:var(--accent-light);color:var(--accent);">🧠 Food Memory</span>':''}${e.manualDose?'<span class="status-badge" style="background:var(--surface2);color:var(--text2);">✏️ Manual</span>':''}${e.fasting?' <span class="status-badge badge-fasting">Fasting</span>':''}</div>${e.note?`<div class="log-note">${e.note} <button class="note-edit-btn" onclick="openNoteEditModal(${e.id})">edit</button></div>`:`<button class="note-edit-btn" onclick="openNoteEditModal(${e.id})">+ add note</button>`}</div>
+        <div><div class="log-meal">${MEALS[e.meal]} <button class="note-edit-btn" onclick="openMealEditModal(${e.id})">edit</button> ${trendStr?`<span style="font-size:14px;">${trendStr}</span>`:''}${e.noCarbs?'<span class="status-badge" style="background:var(--amber-light);color:var(--amber);">🍽️ No carbs</span>':''}${e.foodMemory?'<span class="status-badge" style="background:var(--accent-light);color:var(--accent);">🧠 Food Memory</span>':''}${e.manualDose?'<span class="status-badge" style="background:var(--surface2);color:var(--text2);">✏️ Manual</span>':''}${e.fasting?' <span class="status-badge badge-fasting">Fasting</span>':''}</div>${e.note?`<div class="log-note">${e.note} <button class="note-edit-btn" onclick="openNoteEditModal(${e.id})">edit</button></div>`:`<button class="note-edit-btn" onclick="openNoteEditModal(${e.id})">+ add note</button>`}</div>
         <div style="display:flex;align-items:center;gap:4px;"><div class="log-date">${dateStr}<br>${timeStr}</div><button class="delete-btn" onclick="deleteEntry(${e.id})">&#215;</button></div>
       </div>
       <div class="log-stats">
@@ -1775,6 +1785,32 @@ document.getElementById('c-carbs').addEventListener('input',()=>{
   }
   updateCalcButtons();
 });
+
+// ── Meal type editing ──
+let mealEditId=null;
+function openMealEditModal(id){
+  mealEditId=id;
+  const entry=log.find(e=>e.id===id);
+  if(!entry)return;
+  const opts=document.getElementById('meal-edit-options');
+  opts.innerHTML=MEALS.map((m,i)=>`
+    <button onclick="saveMealEdit(${i})" style="padding:12px;border-radius:var(--radius-sm);border:1px solid ${entry.meal===i?'var(--accent)':'var(--border)'};background:${entry.meal===i?'var(--accent-light)':'var(--surface2)'};color:${entry.meal===i?'var(--accent)':'var(--text)'};font-size:14px;font-family:'DM Sans',sans-serif;cursor:pointer;text-align:left;font-weight:${entry.meal===i?'600':'400'};">
+      ${m}${entry.meal===i?' ✓':''}
+    </button>`).join('');
+  document.getElementById('meal-edit-modal').classList.add('show');
+}
+function closeMealEditModal(){
+  document.getElementById('meal-edit-modal').classList.remove('show');
+  mealEditId=null;
+}
+function saveMealEdit(mealIndex){
+  if(mealEditId===null)return;
+  const entry=log.find(e=>e.id===mealEditId);
+  if(!entry)return;
+  entry.meal=mealIndex;
+  saveLS();closeMealEditModal();renderLog();
+  showToast('Meal type updated');
+}
 
 // ── Note editing ──
 let noteEditId=null;
