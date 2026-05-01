@@ -152,6 +152,9 @@ canvas{display:block;}
 .mav-left{flex:1;}
 .mav-name{font-size:14px;color:var(--text);}
 .mav-meta{font-size:11px;color:var(--text3);margin-top:2px;}
+.pattern-flag{display:flex;align-items:flex-start;gap:7px;margin-top:7px;padding:7px 9px;background:#fdf6ee;border-radius:var(--radius-sm);border-left:2px solid var(--amber);}
+.pattern-flag-text{font-size:11px;color:var(--text2);line-height:1.6;}
+.pattern-flag-text b{color:var(--amber);font-weight:600;}
 .mav-pills{display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end;}
 .mav-pill{font-size:13px;font-weight:500;padding:4px 10px;border-radius:20px;}
 .mav-pre{background:var(--surface2);color:var(--text2);}
@@ -1267,9 +1270,19 @@ function renderTrends(){
     let postPill=`<span style="font-size:12px;color:var(--text3);">no post</span>`;
     if(avgPost){const c=getBgColor(parseFloat(avgPost),settings.target);postPill=`<span class="mav-pill" style="background:${c.bg};color:${c.fg};">${avgPost}</span>`;}
     const sug=suggestions[i];
-    mealRows+=`<div class="meal-avg-row">
-      <div class="mav-left"><div class="mav-name">${MEALS[i]}</div><div class="mav-meta">avg ${avgDose} u · ${entries.length} entries</div>${sug?`<div class="suggestion-tag ${sug.confidence}">Suggest: ${sug.value} g/u · ${sug.days}d</div>`:''}</div>
-      <div class="mav-pills"><span class="mav-pill mav-pre">${avgPre}</span>${postPill}</div>
+
+    // Post-meal low pattern: check last 6 entries with postBg, flag if 3+ are below 70
+    const recentWithPost=withP.slice(0,6);
+    const lowCount=recentWithPost.filter(e=>e.postBg<70).length;
+    const showFlag=recentWithPost.length>=4&&lowCount>=Math.ceil(recentWithPost.length*0.5);
+    const flagHTML=showFlag?`<div class="pattern-flag"><span style="font-size:13px;flex-shrink:0;">📉</span><span class="pattern-flag-text"><b>Post-meal lows in ${lowCount} of last ${recentWithPost.length} entries</b> — dose may be slightly high for this meal.</span></div>`:'';
+
+    mealRows+=`<div class="meal-avg-row" style="${showFlag?'flex-direction:column;align-items:flex-start;':''}">
+      <div style="display:flex;align-items:center;width:100%;">
+        <div class="mav-left"><div class="mav-name">${MEALS[i]}</div><div class="mav-meta">avg ${avgDose} u · ${entries.length} entries</div>${sug?`<div class="suggestion-tag ${sug.confidence}">Suggest: ${sug.value} g/u · ${sug.days}d</div>`:''}</div>
+        <div class="mav-pills"><span class="mav-pill mav-pre">${avgPre}</span>${postPill}</div>
+      </div>
+      ${flagHTML}
     </div>`;
   }
   const withPost=doseLogs.filter(e=>e.postBg!==null);
@@ -1303,6 +1316,7 @@ function renderTrends(){
           <div style="font-size:11px;color:var(--text2);line-height:1.5;">Morning fasting BG averaging ${morningAvg.toFixed(0)} mg/dL across ${morningFastings.length} readings — consistently above target. Worth discussing with your doctor.</div>
         </div>`:''}
       </div>`:''}
+      <p style="font-size:10px;color:var(--text3);margin-top:12px;padding-top:10px;border-top:1px solid var(--border);">📉 Post-meal lows = post-BG readings below 70 mg/dL</p>
     </div>
 
     ${tir?`<div class="card">
