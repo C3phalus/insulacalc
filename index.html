@@ -242,7 +242,7 @@ canvas{display:block;}
 .iob-pill-dot{width:8px;height:8px;border-radius:50%;background:rgba(255,255,255,0.5);}
 .iob-pill-txt{font-size:13px;font-weight:500;color:#fff;}
 .iob-pill-sub{font-size:11px;color:rgba(255,255,255,0.75);}
-.situation-row{display:flex;gap:6px;margin-bottom:12px;}
+.situation-row{display:none;gap:6px;margin-bottom:12px;}
 .sit-btn{flex:1;padding:6px 4px 8px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);cursor:pointer;font-size:11px;color:var(--text2);text-align:center;line-height:1.3;font-family:'DM Sans',sans-serif;transition:all 0.15s;}
 .sit-btn.active{background:var(--amber);color:#fff;border-color:var(--amber);}
 .sit-btn .sit-icon{font-size:14px;display:block;margin-bottom:3px;}
@@ -787,7 +787,7 @@ function computeIOB(){
   if(!settings.iobEnabled) return 0;
   const now=Date.now();
   const durationMs=settings.iobDuration*60*60*1000;
-  const speedMult=SIT_DECAY[selectedSituation];
+  const speedMult=1.0; // situation modifier disabled — SIT_DECAY kept for future use
   let iob=0;
   log.filter(e=>e.type==='dose').forEach(e=>{
     const elapsed=(now-new Date(e.ts).getTime());
@@ -811,7 +811,7 @@ function updateIOBDisplay(){
   const recent=log.find(e=>e.type==='dose');
   if(recent){
     const mins=Math.floor((Date.now()-new Date(recent.ts).getTime())/60000);
-    document.getElementById('iob-pill-sub').textContent=`${mins} min ago · ${SIT_LABELS[selectedSituation]}`;
+    document.getElementById('iob-pill-sub').textContent=`${mins} min ago`;
   }
 }
 
