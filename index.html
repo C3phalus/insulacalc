@@ -172,6 +172,17 @@ canvas{display:block;}
 
 /* report preview */
 #report-preview{background:#fff;border-radius:var(--radius);border:1px solid var(--border);padding:16px;font-size:12px;}
+.rp-span-selector{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;margin-bottom:12px;scrollbar-width:none;}
+.rp-span-selector::-webkit-scrollbar{display:none;}
+.rp-span-btn{flex-shrink:0;padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;white-space:nowrap;transition:all 0.15s;}
+.rp-span-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.rp-chart-wrap{position:relative;height:130px;margin:4px 0 6px;}
+.rp-chart-legend{display:flex;gap:14px;margin-bottom:4px;}
+.rp-legend-item{display:flex;align-items:center;gap:5px;font-size:9px;color:var(--text2);}
+.rp-chart-yaxis-left{position:absolute;left:0;top:0;bottom:16px;display:flex;flex-direction:column;justify-content:space-between;font-size:7px;color:var(--text3);text-align:right;width:26px;}
+.rp-chart-yaxis-right{position:absolute;right:0;top:0;bottom:16px;display:flex;flex-direction:column;justify-content:space-between;font-size:7px;color:#c0392b;text-align:left;width:22px;}
+.rp-chart-area{position:absolute;left:30px;right:26px;top:0;bottom:16px;}
+.rp-chart-xaxis{position:absolute;left:30px;right:26px;bottom:0;display:flex;justify-content:space-between;font-size:7px;color:var(--text3);}
 .rp-header{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:8px;}
 .rp-title{font-family:'DM Serif Display',serif;font-size:22px;color:var(--accent);}
 .rp-date{font-size:10px;color:var(--text3);text-align:right;line-height:1.5;}
@@ -511,6 +522,13 @@ canvas{display:block;}
         <button class="btn-primary" style="margin:0;padding:10px 18px;font-size:13px;" onclick="exportPDF()">Export PDF →</button>
       </div>
       <p style="font-size:11px;color:var(--text3);margin-bottom:12px;">PDF will be saved to your Downloads folder.</p>
+      <div class="rp-span-selector">
+        <button class="rp-span-btn" onclick="setReportSpan(this,'all')">All Time</button>
+        <button class="rp-span-btn" onclick="setReportSpan(this,'ytd')">Year to Date</button>
+        <button class="rp-span-btn" onclick="setReportSpan(this,'3m')">Last 3 Months</button>
+        <button class="rp-span-btn active" onclick="setReportSpan(this,'1m')">Last Month</button>
+        <button class="rp-span-btn" onclick="setReportSpan(this,'1w')">Last Week</button>
+      </div>
       <div id="report-preview"></div>
     </div>
 
@@ -714,7 +732,7 @@ function switchTab(name,el){
   if(name==='trends') renderTrends();
   if(name==='weekly') renderWeekly();
   if(name==='accuracy') renderAccuracy();
-  if(name==='report') renderReportPreview();
+  if(name==='report') renderReportPreview(currentReportSpan);
   if(name==='settings') loadSettings();
   checkNudge();
 }
@@ -2096,18 +2114,102 @@ function renderAccuracy(){
 }
 
 // ── Report Preview ──
-function renderReportPreview(){
+let currentReportSpan='1m';
+
+function setReportSpan(btn,span){
+  document.querySelectorAll('.rp-span-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  currentReportSpan=span;
+  renderReportPreview(span);
+}
+
+function getSpanCutoff(span){
+  const now=Date.now();
+  if(span==='1w') return now-7*24*60*60*1000;
+  if(span==='1m') return now-30*24*60*60*1000;
+  if(span==='3m') return now-90*24*60*60*1000;
+  if(span==='ytd'){
+    const d=new Date(); d.setMonth(0);d.setDate(1);d.setHours(0,0,0,0);
+    return d.getTime();
+  }
+  return 0; // all time
+}
+
+function getSpanLabel(span){
+  const now=new Date();
+  if(span==='1w') return 'Last Week';
+  if(span==='1m') return 'Last Month · '+now.toLocaleDateString('pt-PT',{month:'short',year:'numeric'});
+  if(span==='3m') return 'Last 3 Months';
+  if(span==='ytd') return 'Year to Date · '+now.getFullYear();
+  return 'All Time';
+}
+
+function getChartData(span,doseLogs){
+  const now=Date.now();
+  if(span==='1w'){
+    // daily for last 7 days
+    const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+    return Array.from({length:7},(_,i)=>{
+      const dStart=now-(6-i)*24*60*60*1000;
+      const dEnd=dStart+24*60*60*1000;
+      const ents=doseLogs.filter(e=>{const t=new Date(e.ts).getTime();return t>=dStart&&t<dEnd;});
+      const post=ents.filter(e=>e.postBg!==null);
+      const avgBg=ents.length?(ents.reduce((a,e)=>a+e.bg,0)/ents.length):null;
+      const ok=post.filter(e=>e.postBg>=70&&e.postBg<=180).length;
+      const tir=post.length?Math.round(ok/post.length*100):null;
+      const d=new Date(dStart);
+      return{label:days[d.getDay()===0?6:d.getDay()-1],bg:avgBg,tir};
+    });
+  }
+  if(span==='1m'||span==='3m'){
+    // weekly
+    const weeks=span==='1m'?4:12;
+    return Array.from({length:weeks},(_,i)=>{
+      const wEnd=now-(weeks-1-i)*7*24*60*60*1000;
+      const wStart=wEnd-7*24*60*60*1000;
+      const ents=doseLogs.filter(e=>{const t=new Date(e.ts).getTime();return t>=wStart&&t<wEnd;});
+      const post=ents.filter(e=>e.postBg!==null);
+      const avgBg=ents.length?(ents.reduce((a,e)=>a+e.bg,0)/ents.length):null;
+      const ok=post.filter(e=>e.postBg>=70&&e.postBg<=180).length;
+      const tir=post.length?Math.round(ok/post.length*100):null;
+      return{label:`W${i+1}`,bg:avgBg,tir};
+    });
+  }
+  // ytd or all time — monthly
+  const months=[];
+  const start=new Date(getSpanCutoff(span));
+  const end=new Date();
+  let cur=new Date(start.getFullYear(),start.getMonth(),1);
+  while(cur<=end){
+    const mStart=cur.getTime();
+    const mEnd=new Date(cur.getFullYear(),cur.getMonth()+1,1).getTime();
+    const ents=doseLogs.filter(e=>{const t=new Date(e.ts).getTime();return t>=mStart&&t<mEnd;});
+    const post=ents.filter(e=>e.postBg!==null);
+    const avgBg=ents.length?(ents.reduce((a,e)=>a+e.bg,0)/ents.length):null;
+    const ok=post.filter(e=>e.postBg>=70&&e.postBg<=180).length;
+    const tir=post.length?Math.round(ok/post.length*100):null;
+    months.push({label:cur.toLocaleDateString('pt-PT',{month:'short'}),bg:avgBg,tir});
+    cur=new Date(cur.getFullYear(),cur.getMonth()+1,1);
+  }
+  return months;
+}
+
+function renderReportPreview(span){
+  span=span||currentReportSpan;
   const el=document.getElementById('report-preview');
-  const doseLogs=log.filter(e=>e.type==='dose');
+  if(!el) return;
+
+  const cutoff=getSpanCutoff(span);
+  const doseLogs=log.filter(e=>e.type==='dose'&&new Date(e.ts).getTime()>=cutoff);
+  const glucoseLogs=log.filter(e=>e.type==='glucose'&&new Date(e.ts).getTime()>=cutoff);
   const withPost=doseLogs.filter(e=>e.postBg!==null);
   const tir=computeTIR(withPost);
-  const hba1c=estimateHbA1c();
-  const fastings=[...doseLogs.filter(e=>e.fasting),...log.filter(e=>e.type==='glucose'&&e.fasting)];
-  const morningFastings=fastings.filter(e=>{const h=new Date(e.ts).getHours();return h>=5&&h<10;});
-  const fastAvg=fastings.length?(fastings.reduce((a,e)=>a+e.bg,0)/fastings.length).toFixed(0):null;
-  const allBg=[...doseLogs.map(e=>e.bg),...log.filter(e=>e.type==='glucose').map(e=>e.bg)];
+  const allBg=[...doseLogs.map(e=>e.bg),...glucoseLogs.map(e=>e.bg)];
   const avgBg=allBg.length?(allBg.reduce((a,b)=>a+b,0)/allBg.length).toFixed(0):null;
-  const suggestions=computeSuggestions();
+  const hba1c=allBg.length>=5?(28.7*avgBg/18-46.7/18+2.15).toFixed(1):null;
+  const fastings=[...doseLogs.filter(e=>e.fasting),...glucoseLogs.filter(e=>e.fasting)];
+  const fastAvg=fastings.length?(fastings.reduce((a,e)=>a+e.bg,0)/fastings.length).toFixed(0):null;
+  const suggestions=computeSuggestions(); // always 14-day regardless of span
   const tolerance=0.5;
   const calcDoses=doseLogs.filter(e=>e.suggested!=null);
   const onTarget=calcDoses.filter(e=>Math.abs(e.total-e.suggested)<=tolerance);
@@ -2116,30 +2218,24 @@ function renderReportPreview(){
   const today=new Date().toLocaleDateString('pt-PT',{day:'2-digit',month:'short',year:'numeric'});
 
   // Tiles
-  const tiles=[
+  const tirColor=tir&&tir.ok>=70?'#2d5a3d':'#d4891a';
+  const tirBg=tir&&tir.ok>=70?'#e8f5e9':'#fff3e0';
+  const tilesHTML=[
     {label:'AVG BLOOD GLUCOSE',val:avgBg?`${avgBg} mg/dL`:'—',unit:'',bg:'#e8f5e9',fg:'#2d5a3d'},
     {label:'EST. HbA1c',val:hba1c?`${hba1c}%`:'—',unit:'estimated',bg:'#e8f5e9',fg:'#2d5a3d'},
-    {label:'TIME IN RANGE',val:tir?`${tir.ok}%`:'—',unit:'of readings',bg:'#fff3e0',fg:'#d4891a'},
+    {label:'TIME IN RANGE',val:tir?`${tir.ok}%`:'—',unit:'of readings',bg:tirBg,fg:tirColor},
     {label:'TOTAL DOSES',val:`${doseLogs.length}`,unit:'this period',bg:'#edeae3',fg:'#2d5a3d'},
-  ];
-  const tilesHTML=tiles.map(t=>`
-    <div class="rp-tile" style="background:${t.bg};">
-      <div class="rp-tile-label" style="color:${t.fg};">${t.label}</div>
-      <div class="rp-tile-val" style="color:${t.fg};">${t.val}</div>
-      <div class="rp-tile-unit" style="color:${t.fg};">${t.unit}</div>
-    </div>`).join('');
+  ].map(t=>`<div class="rp-tile" style="background:${t.bg};"><div class="rp-tile-label" style="color:${t.fg};">${t.label}</div><div class="rp-tile-val" style="color:${t.fg};">${t.val}</div><div class="rp-tile-unit" style="color:${t.fg};">${t.unit}</div></div>`).join('');
 
   // TIR bar
-  const tirHTML=tir?`
-    <div class="rp-tir-bar">
-      <div class="rp-tir-seg" style="width:${tir.lo}%;background:#c0392b;">${tir.lo>8?tir.lo+'%':''}</div>
-      <div class="rp-tir-seg" style="width:${tir.ok}%;background:#2d5a3d;">${tir.ok>8?tir.ok+'%':''}</div>
-      <div class="rp-tir-seg" style="width:${tir.hi}%;background:#d4891a;">${tir.hi>8?tir.hi+'%':''}</div>
-    </div>
-    <div style="font-size:7px;color:#888;margin-bottom:6px;">Target: 70–180 mg/dL &nbsp;·&nbsp; ${tir.total} post-meal readings</div>`
-  :'<div style="font-size:8px;color:#888;">Not enough post-meal data yet.</div>';
+  const tirHTML=tir?`<div class="rp-tir-bar">
+    <div class="rp-tir-seg" style="width:${tir.lo}%;background:#c0392b;">${tir.lo>8?tir.lo+'%':''}</div>
+    <div class="rp-tir-seg" style="width:${tir.ok}%;background:#2d5a3d;">${tir.ok>8?tir.ok+'%':''}</div>
+    <div class="rp-tir-seg" style="width:${tir.hi}%;background:#d4891a;">${tir.hi>8?tir.hi+'%':''}</div>
+    </div><div style="font-size:7px;color:#888;margin-bottom:6px;">Target: 70–180 mg/dL · ${tir.total} post-meal readings</div>`
+  :'<div style="font-size:8px;color:#888;margin-bottom:6px;">Not enough post-meal data yet.</div>';
 
-  // Meal table
+  // Meal table — all 6 + fasting
   let mealRows='';
   for(let i=0;i<6;i++){
     const ents=doseLogs.filter(e=>e.meal===i);
@@ -2152,49 +2248,45 @@ function renderReportPreview(){
     const acc=mCalc.length?Math.round(mCalc.filter(e=>Math.abs(e.total-e.suggested)<=tolerance).length/mCalc.length*100)+'%':'—';
     mealRows+=`<tr><td>${MEALS[i]}</td><td>${pre}</td><td>${post}</td><td>${dose} u</td><td>${acc}</td></tr>`;
   }
+  if(fastAvg) mealRows+=`<tr style="color:#888;font-style:italic;border-top:1px solid var(--surface2);"><td>Fasting</td><td>${fastAvg}</td><td>—</td><td>—</td><td>—</td></tr>`;
 
-  // Ratio suggestions
+  // Ratio suggestions — always 14-day
   let ratioRows='';
   MEALS.forEach((m,i)=>{
     const s=suggestions[i];
     const cur=settings.ratios[i];
+    // derive used ratio from period entries
+    const periodEnts=doseLogs.filter(e=>e.meal===i&&e.carbs&&e.mealDose>0);
+    const usedRatio=periodEnts.length?(periodEnts.reduce((a,e)=>a+(e.carbs/e.mealDose),0)/periodEnts.length).toFixed(0):null;
+    const usedStr=usedRatio?`1:${usedRatio}`:'—';
     const sigColor=s?s.confidence==='high'?'#2d5a3d':s.confidence==='med'?'#d4891a':'#c0392b':'#888';
     const sigLabel=s?s.confidence==='high'?'✓ Strong':s.confidence==='med'?'↑ Adjust':'⚠ Low data':'Insufficient';
-    ratioRows+=`<tr><td>${m}</td><td>1:${cur}</td><td>${s?'1:'+s.value:'—'}</td><td>${s?s.days+' days':'—'}</td><td style="color:${sigColor};font-weight:600;">${sigLabel}</td></tr>`;
+    ratioRows+=`<tr><td>${m}</td><td>1:${cur}${usedStr!=='—'&&usedStr!==`1:${cur}`?`<br><span style="font-size:6.5px;color:#888;">used: ${usedStr}</span>`:''}</td><td>${s?'1:'+s.value:'—'}</td><td style="color:${sigColor};font-weight:600;">${sigLabel}</td></tr>`;
   });
 
-  // Snapshot boxes
-  const fastBox=fastAvg?`
-    <div class="rp-box" style="background:#e8f5e9;">
-      <div class="rp-box-label" style="color:#2d5a3d;">FASTING GLUCOSE</div>
-      <div class="rp-box-val" style="color:#2d5a3d;">${fastAvg} mg/dL</div>
-      <div class="rp-box-sub" style="color:#2d5a3d;">${fastings.length} readings</div>
-    </div>`:'';
+  // Snapshot
+  const fastBox=fastAvg?`<div class="rp-box" style="background:#e8f5e9;"><div class="rp-box-label" style="color:#2d5a3d;">FASTING GLUCOSE</div><div class="rp-box-val" style="color:#2d5a3d;">${fastAvg} mg/dL</div><div class="rp-box-sub" style="color:#2d5a3d;">${fastings.length} readings</div></div>`:'';
+  const accBox=pct!==null?`<div class="rp-box" style="background:#edeae3;"><div class="rp-box-label" style="color:#2d5a3d;">DOSE ACCURACY</div><div class="rp-box-val" style="color:#2d5a3d;">${pct}% on target</div><div class="rp-box-sub" style="color:${avgOverride>0.1?'#d4891a':avgOverride<-0.1?'#c0392b':'#2d5a3d'};">${avgOverride>=0?'+':''}${avgOverride.toFixed(1)} u avg override</div></div>`:'';
 
-  const accBox=pct!==null?`
-    <div class="rp-box" style="background:#edeae3;">
-      <div class="rp-box-label" style="color:#2d5a3d;">DOSE ACCURACY</div>
-      <div class="rp-box-val" style="color:#2d5a3d;">${pct}% on target</div>
-      <div class="rp-box-sub" style="color:${avgOverride>0.1?'#d4891a':avgOverride<-0.1?'#c0392b':'#2d5a3d'};">${avgOverride>=0?'+':''}${avgOverride.toFixed(1)} u avg override</div>
-    </div>`:'';
+  // Chart data
+  const chartData=getChartData(span,doseLogs);
+  const chartTitle=span==='1w'?'daily':span==='1m'||span==='3m'?'by week':'by month';
+  const xLabels=chartData.map(d=>d.label);
 
   el.innerHTML=`
     <div class="rp-header">
       <div class="rp-title">Glucus</div>
-      <div class="rp-date">Weekly Report · ${today}<br>Generated by Glucus PWA</div>
+      <div class="rp-date">${getSpanLabel(span)}<br>Generated by Glucus PWA</div>
     </div>
     <hr class="rp-divider">
-
     <div class="rp-tiles">${tilesHTML}</div>
-
     <div class="rp-section">Time in Range</div>
     ${tirHTML}
-
     <div class="rp-two-col">
       <div>
         <div class="rp-section">Per-Meal Averages</div>
         <table class="rp-table">
-          <thead><tr><th>Meal</th><th>Pre-BG</th><th>Post-BG</th><th>Avg Dose</th><th>Accuracy</th></tr></thead>
+          <thead><tr><th>Meal</th><th>Pre-BG</th><th>Post-BG</th><th>Avg Dose</th><th>Acc.</th></tr></thead>
           <tbody>${mealRows||'<tr><td colspan="5" style="color:#888;">No data yet.</td></tr>'}</tbody>
         </table>
       </div>
@@ -2203,15 +2295,90 @@ function renderReportPreview(){
         ${fastBox}${accBox}
       </div>
     </div>
-
-    <div class="rp-section">Ratio Suggestions</div>
+    <div class="rp-section">Ratio Suggestions <span style="font-weight:400;font-style:italic;color:var(--text3);text-transform:none;letter-spacing:0;font-size:8px;">— always last 14 days</span></div>
     <table class="rp-table">
-      <thead><tr><th>Meal</th><th>Current</th><th>Suggested</th><th>Based on</th><th>Signal</th></tr></thead>
+      <thead><tr><th>Meal</th><th>Current · Used</th><th>Suggested</th><th>Signal</th></tr></thead>
       <tbody>${ratioRows}</tbody>
     </table>
-
+    <p style="font-size:7px;color:var(--text3);margin-top:3px;font-style:italic;">Suggestions always reflect the last 14 days, independent of selected period.</p>
+    <div class="rp-section">Avg Glucose & Time in Range — ${chartTitle}</div>
+    <div class="rp-chart-legend">
+      <div class="rp-legend-item"><svg width="16" height="8"><line x1="0" y1="4" x2="16" y2="4" stroke="#2d5a3d" stroke-width="2"/></svg>Avg BG (mg/dL)</div>
+      <div class="rp-legend-item"><svg width="16" height="8"><line x1="0" y1="4" x2="16" y2="4" stroke="#c0392b" stroke-width="1.5" stroke-dasharray="3,2"/></svg>Time in Range %</div>
+    </div>
+    <div class="rp-chart-wrap">
+      <div class="rp-chart-yaxis-left"><span>200</span><span>160</span><span>120</span><span>80</span></div>
+      <div class="rp-chart-yaxis-right"><span>100%</span><span>75%</span><span>50%</span><span>25%</span></div>
+      <div class="rp-chart-area"><canvas id="rp-chart"></canvas></div>
+      <div class="rp-chart-xaxis">${xLabels.map(l=>`<span>${l}</span>`).join('')}</div>
+    </div>
     <div class="rp-disclaimer">This report was generated automatically by Glucus. It is intended to support — not replace — your prescribed insulin plan and the guidance of your healthcare team. Always consult your doctor before making any changes to your insulin ratios or correction factors.</div>
   `;
+
+  // Draw chart
+  setTimeout(()=>drawReportChart(chartData),30);
+}
+
+function drawReportChart(data){
+  const canvas=document.getElementById('rp-chart');
+  if(!canvas) return;
+  const area=canvas.parentElement;
+  const dpr=window.devicePixelRatio||1;
+  canvas.width=area.offsetWidth*dpr;
+  canvas.height=area.offsetHeight*dpr;
+  canvas.style.width=area.offsetWidth+'px';
+  canvas.style.height=area.offsetHeight+'px';
+  const ctx=canvas.getContext('2d');
+  ctx.scale(dpr,dpr);
+  const W=area.offsetWidth,H=area.offsetHeight;
+  const n=data.length;
+  if(n<2) return;
+  const pL=4,pR=4,pT=8,pB=4;
+  const cW=W-pL-pR,cH=H-pT-pB;
+  const xp=i=>pL+(n===1?cW/2:(i/(n-1))*cW);
+  const byp=v=>pT+cH-((v-70)/(200-70))*cH;
+  const typ=v=>pT+cH-((v-0)/(100-0))*cH; // 100% at top, 0% at bottom
+
+  // Grid
+  ctx.strokeStyle='#edeae3';ctx.lineWidth=0.5;
+  [80,120,160,200].forEach(v=>{ctx.beginPath();ctx.moveTo(pL,byp(v));ctx.lineTo(W-pR,byp(v));ctx.stroke();});
+
+  // Target band
+  ctx.fillStyle='rgba(45,90,61,0.05)';
+  ctx.fillRect(pL,byp(180),cW,byp(70)-byp(180));
+
+  // TIR dashed line
+  ctx.strokeStyle='#c0392b';ctx.lineWidth=1.5;ctx.setLineDash([3,2]);
+  ctx.beginPath();
+  data.forEach((d,i)=>{if(d.tir===null) return;i===0||data[i-1].tir===null?ctx.moveTo(xp(i),typ(d.tir)):ctx.lineTo(xp(i),typ(d.tir));});
+  ctx.stroke();ctx.setLineDash([]);
+
+  // TIR dots
+  data.forEach((d,i)=>{if(d.tir===null) return;ctx.fillStyle='#c0392b';ctx.beginPath();ctx.arc(xp(i),typ(d.tir),2.5,0,Math.PI*2);ctx.fill();});
+
+  // BG area
+  ctx.beginPath();
+  const firstBg=data.find(d=>d.bg!==null);
+  if(firstBg){
+    data.forEach((d,i)=>{if(!d.bg) return;i===0||!data[i-1]?.bg?ctx.moveTo(xp(i),byp(d.bg)):ctx.lineTo(xp(i),byp(d.bg));});
+    ctx.lineTo(xp(n-1),H-pB);ctx.lineTo(xp(0),H-pB);ctx.closePath();
+    ctx.fillStyle='rgba(45,90,61,0.07)';ctx.fill();
+  }
+
+  // BG line
+  ctx.strokeStyle='#2d5a3d';ctx.lineWidth=2;ctx.lineJoin='round';
+  ctx.beginPath();
+  data.forEach((d,i)=>{if(!d.bg) return;i===0||!data[i-1]?.bg?ctx.moveTo(xp(i),byp(d.bg)):ctx.lineTo(xp(i),byp(d.bg));});
+  ctx.stroke();
+
+  // BG dots + value labels pinned to bottom
+  data.forEach((d,i)=>{
+    if(!d.bg) return;
+    ctx.fillStyle='#2d5a3d';ctx.beginPath();ctx.arc(xp(i),byp(d.bg),3,0,Math.PI*2);ctx.fill();
+    ctx.font='bold 7px DM Sans';
+    ctx.textAlign=i===0?'left':i===n-1?'right':'center';
+    ctx.fillText(Math.round(d.bg),xp(i),H-pB-2);
+  });
 }
 
 // ── Init ──
