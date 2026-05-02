@@ -1177,7 +1177,141 @@ function exportPDF(){
     alternateRowStyles:{fillColor:SURF},
     theme:'plain',
   });
-  y=doc.lastAutoTable.finalY+5;
+  y=doc.lastAutoTable.finalY+4;
+
+  // Chart — Avg BG + TIR by week (last 4 weeks)
+  doc.setFont('helvetica','bold');doc.setFontSize(8);doc.setTextColor(...ACC);
+  doc.text('Avg Glucose & Time in Range — last 4 weeks',LM,y);y+=3;
+
+  // Build weekly data from log
+  const now=Date.now();
+  const weekData=[];
+  for(let w=3;w>=0;w--){
+    const wStart=now-(w+1)*7*24*60*60*1000;
+    const wEnd=now-w*7*24*60*60*1000;
+    const wEntries=log.filter(e=>e.type==='dose'&&new Date(e.ts).getTime()>=wStart&&new Date(e.ts).getTime()<wEnd);
+    const wPost=wEntries.filter(e=>e.postBg!==null);
+    const avgBgW=wEntries.length?(wEntries.reduce((a,e)=>a+e.bg,0)/wEntries.length):null;
+    const wLo=wPost.filter(e=>e.postBg<70).length;
+    const wOk=wPost.filter(e=>e.postBg>=70&&e.postBg<=180).length;
+    const wHi=wPost.filter(e=>e.postBg>180).length;
+    const wTotal=wLo+wOk+wHi;
+    const tirW=wTotal>0?Math.round(wOk/wTotal*100):null;
+    weekData.push({label:`W${4-w}`,bg:avgBgW,tir:tirW});
+  }
+
+  const validWeeks=weekData.filter(w=>w.bg!==null);
+  if(validWeeks.length>=2){
+    const CH=28, CW=PW;
+    const pL=8,pR=8,pT=4,pB=6;
+    const plotW=CW-pL-pR, plotH=CH-pT-pB;
+    const n=weekData.length;
+    const bgMin=70,bgMax=200;
+
+    const xp=i=>LM+pL+(i/(n-1))*plotW;
+    const byp=v=>y+pT+plotH-((v-bgMin)/(bgMax-bgMin))*plotH;
+    const typ=v=>y+pT+plotH-((v-0)/(100-0))*plotH; // fixed: 100% at top
+
+    // Grid
+    doc.setDrawColor(...SURF);doc.setLineWidth(0.3);
+    [80,120,160,200].forEach(v=>{
+      doc.line(LM+pL,byp(v),LM+pL+plotW,byp(v));
+    });
+
+    // Target band
+    doc.setFillColor(240,247,242);
+    doc.rect(LM+pL,byp(180),plotW,byp(70)-byp(180),'F');
+
+    // Y axis labels left
+    doc.setFont('helvetica','normal');doc.setFontSize(6);doc.setTextColor(...TEXT3);
+    [[80,'80'],[120,'120'],[160,'160'],[200,'200']].forEach(([v,l])=>{
+      doc.text(l,LM+pL-1,byp(v)+1,{align:'right'});
+    });
+
+    // Y axis labels right (TIR) — fixed direction
+    doc.setTextColor(192,57,43);
+    [[0,'0%'],[25,'25%'],[50,'50%'],[75,'75%'],[100,'100%']].forEach(([v,l])=>{
+      doc.text(l,LM+pL+plotW+1,typ(v)+1);
+    });
+
+    // TIR dashed line
+    doc.setDrawColor(192,57,43);doc.setLineWidth(0.8);
+    weekData.forEach((w,i)=>{
+      if(w.tir===null||i===0) return;
+      const prev=weekData[i-1];
+      if(prev.tir===null) return;
+      // simulate dash
+      const x1=xp(i-1),y1=typ(prev.tir),x2=xp(i),y2=typ(w.tir);
+      const segs=6;
+      for(let s=0;s<segs;s+=2){
+        const sx1=x1+(x2-x1)*(s/segs), sy1=y1+(y2-y1)*(s/segs);
+        const sx2=x1+(x2-x1)*((s+0.8)/segs), sy2=y1+(y2-y1)*((s+0.8)/segs);
+        doc.line(sx1,sy1,sx2,sy2);
+      }
+    });
+
+    // TIR dots
+    weekData.forEach((w,i)=>{
+      if(w.tir===null) return;
+      doc.setFillColor(192,57,43);
+      doc.circle(xp(i),typ(w.tir),0.8,'F');
+    });
+
+    // BG area fill
+    doc.setFillColor(232,245,233);
+    const validBg=weekData.filter(w=>w.bg!==null);
+    if(validBg.length>=2){
+      const pts=[];
+      weekData.forEach((w,i)=>{ if(w.bg) pts.push([xp(i),byp(w.bg)]); });
+      pts.push([xp(n-1),y+pT+plotH],[xp(0),y+pT+plotH]);
+      doc.setFillColor(232,245,233);
+      // draw as filled polygon approximation
+      weekData.forEach((w,i)=>{
+        if(!w.bg||i===0) return;
+        const prev=weekData[i-1];if(!prev.bg) return;
+        doc.setFillColor(232,245,233);
+        doc.triangle(xp(i-1),byp(prev.bg),xp(i),byp(w.bg),xp(i-1),y+pT+plotH,'F');
+        doc.triangle(xp(i),byp(w.bg),xp(i),y+pT+plotH,xp(i-1),y+pT+plotH,'F');
+      });
+    }
+
+    // BG line
+    doc.setDrawColor(...ACC);doc.setLineWidth(1.5);
+    weekData.forEach((w,i)=>{
+      if(!w.bg||i===0) return;
+      const prev=weekData[i-1];if(!prev.bg) return;
+      doc.line(xp(i-1),byp(prev.bg),xp(i),byp(w.bg));
+    });
+
+    // BG dots
+    doc.setFillColor(...ACC);
+    weekData.forEach((w,i)=>{ if(w.bg) doc.circle(xp(i),byp(w.bg),1,'F'); });
+
+    // BG value labels — pinned to bottom, edge-aligned
+    doc.setFont('helvetica','bold');doc.setFontSize(6.5);doc.setTextColor(...ACC);
+    weekData.forEach((w,i)=>{
+      if(!w.bg) return;
+      const align=i===0?'left':i===n-1?'right':'center';
+      doc.text(Math.round(w.bg).toString(),xp(i),y+pT+plotH-1,{align});
+    });
+
+    // X labels
+    doc.setFont('helvetica','normal');doc.setFontSize(6);doc.setTextColor(...TEXT3);
+    weekData.forEach((w,i)=>{
+      const align=i===0?'left':i===n-1?'right':'center';
+      doc.text(w.label,xp(i),y+CH,{align});
+    });
+
+    // Legend
+    doc.setFont('helvetica','normal');doc.setFontSize(7);
+    doc.setTextColor(...ACC);doc.text('— Avg BG (mg/dL)',LM,y+CH+4);
+    doc.setTextColor(192,57,43);doc.text('- - Time in Range %',LM+40,y+CH+4);
+
+    y+=CH+8;
+  } else {
+    doc.setFont('helvetica','normal');doc.setFontSize(7);doc.setTextColor(...TEXT3);
+    doc.text('Not enough data for chart yet.',LM,y);y+=6;
+  }
 
   // Disclaimer
   doc.setDrawColor(...SURF);doc.setLineWidth(0.3);doc.line(LM,y,210-RM,y);y+=3;

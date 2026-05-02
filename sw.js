@@ -1,4 +1,4 @@
-const CACHE = 'insulacalc-v16';
+const CACHE = 'insulacalc-v17';
 const FILES = ['./', './index.html', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', e => {
