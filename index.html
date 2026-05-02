@@ -172,9 +172,8 @@ canvas{display:block;}
 
 /* report preview */
 #report-preview{background:#fff;border-radius:var(--radius);border:1px solid var(--border);padding:16px;font-size:12px;}
-.rp-span-selector{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;margin-bottom:12px;scrollbar-width:none;}
-.rp-span-selector::-webkit-scrollbar{display:none;}
-.rp-span-btn{flex-shrink:0;padding:6px 14px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;white-space:nowrap;transition:all 0.15s;}
+.rp-span-selector{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:12px;}
+.rp-span-btn{padding:7px 4px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);font-size:11px;font-family:'DM Sans',sans-serif;cursor:pointer;white-space:nowrap;transition:all 0.15s;text-align:center;width:100%;}
 .rp-span-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
 .rp-chart-wrap{position:relative;height:130px;margin:4px 0 6px;}
 .rp-chart-legend{display:flex;gap:14px;margin-bottom:4px;}
@@ -527,6 +526,7 @@ canvas{display:block;}
         <button class="rp-span-btn" onclick="setReportSpan(this,'ytd')">Year to Date</button>
         <button class="rp-span-btn" onclick="setReportSpan(this,'3m')">Last 3 Months</button>
         <button class="rp-span-btn active" onclick="setReportSpan(this,'1m')">Last Month</button>
+        <button class="rp-span-btn" onclick="setReportSpan(this,'2w')">Last 2 Weeks</button>
         <button class="rp-span-btn" onclick="setReportSpan(this,'1w')">Last Week</button>
       </div>
       <div id="report-preview"></div>
@@ -2126,18 +2126,20 @@ function setReportSpan(btn,span){
 function getSpanCutoff(span){
   const now=Date.now();
   if(span==='1w') return now-7*24*60*60*1000;
+  if(span==='2w') return now-14*24*60*60*1000;
   if(span==='1m') return now-30*24*60*60*1000;
   if(span==='3m') return now-90*24*60*60*1000;
   if(span==='ytd'){
-    const d=new Date(); d.setMonth(0);d.setDate(1);d.setHours(0,0,0,0);
+    const d=new Date();d.setMonth(0);d.setDate(1);d.setHours(0,0,0,0);
     return d.getTime();
   }
-  return 0; // all time
+  return 0;
 }
 
 function getSpanLabel(span){
   const now=new Date();
   if(span==='1w') return 'Last Week';
+  if(span==='2w') return 'Last 2 Weeks';
   if(span==='1m') return 'Last Month · '+now.toLocaleDateString('pt-PT',{month:'short',year:'numeric'});
   if(span==='3m') return 'Last 3 Months';
   if(span==='ytd') return 'Year to Date · '+now.getFullYear();
@@ -2146,52 +2148,60 @@ function getSpanLabel(span){
 
 function getChartData(span,doseLogs){
   const now=Date.now();
-  if(span==='1w'){
-    // daily for last 7 days
-    const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-    return Array.from({length:7},(_,i)=>{
-      const dStart=now-(6-i)*24*60*60*1000;
-      const dEnd=dStart+24*60*60*1000;
-      const ents=doseLogs.filter(e=>{const t=new Date(e.ts).getTime();return t>=dStart&&t<dEnd;});
-      const post=ents.filter(e=>e.postBg!==null);
-      const avgBg=ents.length?(ents.reduce((a,e)=>a+e.bg,0)/ents.length):null;
-      const ok=post.filter(e=>e.postBg>=70&&e.postBg<=180).length;
-      const tir=post.length?Math.round(ok/post.length*100):null;
-      const d=new Date(dStart);
-      return{label:days[d.getDay()===0?6:d.getDay()-1],bg:avgBg,tir};
-    });
-  }
-  if(span==='1m'||span==='3m'){
-    // weekly
-    const weeks=span==='1m'?4:12;
-    return Array.from({length:weeks},(_,i)=>{
-      const wEnd=now-(weeks-1-i)*7*24*60*60*1000;
-      const wStart=wEnd-7*24*60*60*1000;
-      const ents=doseLogs.filter(e=>{const t=new Date(e.ts).getTime();return t>=wStart&&t<wEnd;});
-      const post=ents.filter(e=>e.postBg!==null);
-      const avgBg=ents.length?(ents.reduce((a,e)=>a+e.bg,0)/ents.length):null;
-      const ok=post.filter(e=>e.postBg>=70&&e.postBg<=180).length;
-      const tir=post.length?Math.round(ok/post.length*100):null;
-      return{label:`W${i+1}`,bg:avgBg,tir};
-    });
-  }
-  // ytd or all time — monthly
-  const months=[];
-  const start=new Date(getSpanCutoff(span));
-  const end=new Date();
-  let cur=new Date(start.getFullYear(),start.getMonth(),1);
-  while(cur<=end){
-    const mStart=cur.getTime();
-    const mEnd=new Date(cur.getFullYear(),cur.getMonth()+1,1).getTime();
-    const ents=doseLogs.filter(e=>{const t=new Date(e.ts).getTime();return t>=mStart&&t<mEnd;});
+
+  // Helper to build a bucket
+  function bucket(ents,label){
     const post=ents.filter(e=>e.postBg!==null);
     const avgBg=ents.length?(ents.reduce((a,e)=>a+e.bg,0)/ents.length):null;
     const ok=post.filter(e=>e.postBg>=70&&e.postBg<=180).length;
     const tir=post.length?Math.round(ok/post.length*100):null;
-    months.push({label:cur.toLocaleDateString('pt-PT',{month:'short'}),bg:avgBg,tir});
+    return{label,bg:avgBg,tir,hasData:ents.length>0};
+  }
+
+  // Daily — last 7 or 14 days, skip empty days
+  if(span==='1w'||span==='2w'){
+    const days=span==='1w'?7:14;
+    const results=[];
+    for(let i=days-1;i>=0;i--){
+      const dStart=new Date(now-i*24*60*60*1000);
+      dStart.setHours(0,0,0,0);
+      const dEnd=new Date(dStart.getTime()+24*60*60*1000);
+      const ents=doseLogs.filter(e=>{const t=new Date(e.ts).getTime();return t>=dStart.getTime()&&t<dEnd.getTime();});
+      const lbl=dStart.toLocaleDateString('pt-PT',{day:'2-digit',month:'short'});
+      const b=bucket(ents,lbl);
+      if(b.hasData) results.push(b);
+    }
+    return results;
+  }
+
+  // Weekly — last month, skip empty weeks
+  if(span==='1m'){
+    const results=[];
+    for(let i=3;i>=0;i--){
+      const wEnd=now-i*7*24*60*60*1000;
+      const wStart=wEnd-7*24*60*60*1000;
+      const ents=doseLogs.filter(e=>{const t=new Date(e.ts).getTime();return t>=wStart&&t<wEnd;});
+      const b=bucket(ents,`W${4-i}`);
+      if(b.hasData) results.push(b);
+    }
+    return results;
+  }
+
+  // Monthly — 3m, ytd, all time
+  const results=[];
+  const startDate=new Date(getSpanCutoff(span));
+  let cur=new Date(startDate.getFullYear(),startDate.getMonth(),1);
+  const end=new Date();
+  while(cur<=end){
+    const mStart=cur.getTime();
+    const mEnd=new Date(cur.getFullYear(),cur.getMonth()+1,1).getTime();
+    const ents=doseLogs.filter(e=>{const t=new Date(e.ts).getTime();return t>=mStart&&t<mEnd;});
+    const lbl=cur.toLocaleDateString('pt-PT',{month:'short',year:'2-digit'});
+    const b=bucket(ents,lbl);
+    if(b.hasData) results.push(b);
     cur=new Date(cur.getFullYear(),cur.getMonth()+1,1);
   }
-  return months;
+  return results;
 }
 
 function renderReportPreview(span){
@@ -2270,7 +2280,7 @@ function renderReportPreview(span){
 
   // Chart data
   const chartData=getChartData(span,doseLogs);
-  const chartTitle=span==='1w'?'daily':span==='1m'||span==='3m'?'by week':'by month';
+  const chartTitle=span==='1w'||span==='2w'?'daily':span==='1m'?'by week':'by month';
   const xLabels=chartData.map(d=>d.label);
 
   el.innerHTML=`
