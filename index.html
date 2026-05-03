@@ -1043,6 +1043,7 @@ function exportPDF(){
   const ACC   =[45,90,61];
   const AMBER =[212,137,26];
   const RED   =[192,57,43];
+  const BLUE  =[26,111,168];
   const SURF  =[237,234,227];
   const TEXT3 =[136,136,136];
   const WHITE =[255,255,255];
@@ -1105,9 +1106,9 @@ function exportPDF(){
   if(tir){
     const barH=5;
     const loW=PW*(tir.lo/100),okW=PW*(tir.ok/100),hiW=PW*(tir.hi/100);
-    doc.setFillColor(...RED);doc.rect(LM,y,loW,barH,'F');
+    doc.setFillColor(...BLUE);doc.rect(LM,y,loW,barH,'F');
     doc.setFillColor(...ACC);doc.rect(LM+loW,y,okW,barH,'F');
-    doc.setFillColor(...AMBER);doc.rect(LM+loW+okW,y,hiW,barH,'F');
+    doc.setFillColor(...RED);doc.rect(LM+loW+okW,y,hiW,barH,'F');
     doc.setFont('helvetica','bold');doc.setFontSize(7);doc.setTextColor(...WHITE);
     if(tir.lo>8)doc.text(`${tir.lo}%`,LM+loW/2,y+3.5,{align:'center'});
     if(tir.ok>8)doc.text(`${tir.ok}%`,LM+loW+okW/2,y+3.5,{align:'center'});
@@ -2216,7 +2217,14 @@ function renderReportPreview(span){
   const tir=computeTIR(withPost);
   const allBg=[...doseLogs.map(e=>e.bg),...glucoseLogs.map(e=>e.bg)];
   const avgBg=allBg.length?(allBg.reduce((a,b)=>a+b,0)/allBg.length).toFixed(0):null;
-  const hba1c=allBg.length>=5?(28.7*avgBg/18-46.7/18+2.15).toFixed(1):null;
+  const hba1cSpan=allBg.length>=5?((parseFloat(avgBg)+46.7)/28.7).toFixed(1):null;
+  // 90-day HbA1c — always fixed regardless of span
+  const bg90=log.filter(e=>new Date(e.ts).getTime()>Date.now()-90*24*60*60*1000);
+  const allBg90=[...bg90.filter(e=>e.type==='dose').map(e=>e.bg),...bg90.filter(e=>e.type==='glucose').map(e=>e.bg)];
+  const avg90=allBg90.length?(allBg90.reduce((a,b)=>a+b,0)/allBg90.length):null;
+  const hba1c90=avg90?((avg90+46.7)/28.7).toFixed(1):null;
+  // Show span sub-line only when span is meaningfully different from 90d
+  const showSpanHba1c=hba1cSpan&&hba1c90&&hba1cSpan!==hba1c90&&span!=='3m'&&span!=='all';
   const fastings=[...doseLogs.filter(e=>e.fasting),...glucoseLogs.filter(e=>e.fasting)];
   const fastAvg=fastings.length?(fastings.reduce((a,e)=>a+e.bg,0)/fastings.length).toFixed(0):null;
   const suggestions=computeSuggestions(); // always 14-day regardless of span
@@ -2230,18 +2238,24 @@ function renderReportPreview(span){
   // Tiles
   const tirColor=tir&&tir.ok>=70?'#2d5a3d':'#d4891a';
   const tirBg=tir&&tir.ok>=70?'#e8f5e9':'#fff3e0';
+  const hba1cTile=`<div class="rp-tile" style="background:#e8f5e9;">
+    <div class="rp-tile-label" style="color:#2d5a3d;">EST. HbA1c</div>
+    <div class="rp-tile-val" style="color:#2d5a3d;">${hba1c90?hba1c90+'%':'—'}</div>
+    <div class="rp-tile-unit" style="color:#2d5a3d;">90-day avg</div>
+    ${showSpanHba1c?`<div style="border-top:1px solid rgba(45,90,61,0.15);margin:4px 0 3px;"></div><div style="font-size:9px;font-weight:600;color:#2d5a3d;opacity:0.65;">${hba1cSpan}%</div><div style="font-size:7px;color:#2d5a3d;opacity:0.5;">this period</div>`:''}
+  </div>`;
   const tilesHTML=[
-    {label:'AVG BLOOD GLUCOSE',val:avgBg?`${avgBg} mg/dL`:'—',unit:'',bg:'#e8f5e9',fg:'#2d5a3d'},
-    {label:'EST. HbA1c',val:hba1c?`${hba1c}%`:'—',unit:'estimated',bg:'#e8f5e9',fg:'#2d5a3d'},
-    {label:'TIME IN RANGE',val:tir?`${tir.ok}%`:'—',unit:'of readings',bg:tirBg,fg:tirColor},
-    {label:'TOTAL DOSES',val:`${doseLogs.length}`,unit:'this period',bg:'#edeae3',fg:'#2d5a3d'},
-  ].map(t=>`<div class="rp-tile" style="background:${t.bg};"><div class="rp-tile-label" style="color:${t.fg};">${t.label}</div><div class="rp-tile-val" style="color:${t.fg};">${t.val}</div><div class="rp-tile-unit" style="color:${t.fg};">${t.unit}</div></div>`).join('');
+    `<div class="rp-tile" style="background:#e8f5e9;"><div class="rp-tile-label" style="color:#2d5a3d;">AVG GLUCOSE</div><div class="rp-tile-val" style="color:#2d5a3d;">${avgBg?avgBg+' mg/dL':'—'}</div><div class="rp-tile-unit" style="color:#2d5a3d;"></div></div>`,
+    hba1cTile,
+    `<div class="rp-tile" style="background:${tirBg};"><div class="rp-tile-label" style="color:${tirColor};">TIME IN RANGE</div><div class="rp-tile-val" style="color:${tirColor};">${tir?tir.ok+'%':'—'}</div><div class="rp-tile-unit" style="color:${tirColor};">of readings</div></div>`,
+    `<div class="rp-tile" style="background:#edeae3;"><div class="rp-tile-label" style="color:#2d5a3d;">TOTAL DOSES</div><div class="rp-tile-val" style="color:#2d5a3d;">${doseLogs.length}</div><div class="rp-tile-unit" style="color:#2d5a3d;">this period</div></div>`,
+  ].join('');
 
   // TIR bar
   const tirHTML=tir?`<div class="rp-tir-bar">
-    <div class="rp-tir-seg" style="width:${tir.lo}%;background:#c0392b;">${tir.lo>8?tir.lo+'%':''}</div>
+    <div class="rp-tir-seg" style="width:${tir.lo}%;background:#1a6fa8;">${tir.lo>8?tir.lo+'%':''}</div>
     <div class="rp-tir-seg" style="width:${tir.ok}%;background:#2d5a3d;">${tir.ok>8?tir.ok+'%':''}</div>
-    <div class="rp-tir-seg" style="width:${tir.hi}%;background:#d4891a;">${tir.hi>8?tir.hi+'%':''}</div>
+    <div class="rp-tir-seg" style="width:${tir.hi}%;background:#c0392b;">${tir.hi>8?tir.hi+'%':''}</div>
     </div><div style="font-size:7px;color:#888;margin-bottom:6px;">Target: 70–180 mg/dL · ${tir.total} post-meal readings</div>`
   :'<div style="font-size:8px;color:#888;margin-bottom:6px;">Not enough post-meal data yet.</div>';
 
