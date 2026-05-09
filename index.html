@@ -2076,6 +2076,7 @@ function openEntryEditModal(id){
       <div class="field"><label>Post-BG (mg/dL)</label><input type="number" id="ee-postbg" value="${e.postBg||''}" placeholder="leave blank if none" inputmode="decimal"></div>`;
   } else {
     fields.innerHTML=`
+      <div class="field"><label>Meal type</label><select id="ee-meal" style="width:100%;padding:10px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);font-size:14px;font-family:'DM Sans',sans-serif;background:#fff;">${MEALS.map((m,i)=>`<option value="${i}"${e.meal===i?' selected':''}>${m}</option>`).join('')}</select></div>
       <div class="field"><label>Pre-BG (mg/dL)</label><input type="number" id="ee-bg" value="${e.bg}" inputmode="decimal"></div>
       <div class="field"><label>Carbs (g) — leave blank if none</label><input type="number" id="ee-carbs" value="${e.carbs!=null?e.carbs:''}" placeholder="blank = no carbs" inputmode="decimal"></div>
       <div class="field"><label>Actual dose taken (u)</label><input type="number" id="ee-total" value="${e.total}" step="0.5" inputmode="decimal"></div>
@@ -2098,6 +2099,8 @@ function saveEntryEdit(){
   e.bg=bg;
   e.postBg=isNaN(postBg)?null:postBg;
   if(e.type==='dose'){
+    const mealIndex=parseInt(document.getElementById('ee-meal').value);
+    if(!isNaN(mealIndex)) e.meal=mealIndex;
     const carbsRaw=document.getElementById('ee-carbs').value;
     const carbs=carbsRaw===''?null:parseFloat(carbsRaw);
     const total=parseFloat(document.getElementById('ee-total').value);
