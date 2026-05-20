@@ -100,7 +100,7 @@ html,body{height:100%;background:var(--bg);font-family:'DM Sans',sans-serif;colo
 /* result */
 .result-box{background:var(--accent-light);border-radius:var(--radius);border:1px solid rgba(45,90,61,0.15);padding:16px;margin-top:12px;display:none;}
 .result-box.show{display:block;}
-.result-num{font-family:'DM Serif Display',serif;font-size:52px;color:var(--accent);line-height:1;}
+.result-num{font-family:'DM Sans',sans-serif;font-size:52px;font-weight:700;color:var(--accent);line-height:1;}
 .result-unit-lbl{font-size:13px;color:var(--accent);opacity:0.7;margin-bottom:12px;}
 .breakdown-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:14px;}
 .bd{background:#fff;border-radius:var(--radius-sm);padding:9px 10px;}
@@ -1453,7 +1453,19 @@ function computeSuggestions(){
     let weightedPost=0,totalWeight=0;
     entries.forEach(e=>{
       const ageDays=(now-new Date(e.ts).getTime())/(24*60*60*1000);
-      const weight=Math.max(0.1,1-(ageDays/14)*0.9);
+      const recencyW=Math.max(0.1,1-(ageDays/14)*0.9);
+
+      // Timing penalty: fast drop to low = ratio was aggressive
+      // Only applies when postBg < 70 AND postTs is available
+      let timingW=1.0;
+      if(e.postBg<70&&e.postTs){
+        const elapsedMin=(new Date(e.postTs).getTime()-new Date(e.ts).getTime())/60000;
+        if(elapsedMin<100) timingW=1.5;       // fast drop — high penalty, pulls ratio down more
+        else if(elapsedMin<140) timingW=1.25; // moderate drop — mild extra penalty
+        // above 140min: no extra penalty, existing low outcome weight applies
+      }
+
+      const weight=recencyW*timingW;
       weightedPost+=e.postBg*weight;
       totalWeight+=weight;
     });
