@@ -422,6 +422,12 @@ canvas{display:block;}
           </div>
         </div>
 
+        <!-- Estimated carbs flag — only relevant when carbs are entered -->
+        <div id="carbs-est-row" style="display:none;align-items:center;gap:8px;margin:-2px 0 10px;">
+          <div class="toggle" id="carbs-est-toggle" onclick="this.classList.toggle('on')" style="transform:scale(0.85);"></div>
+          <span style="font-size:12px;color:var(--text3);">Rough estimate <span style="font-size:11px;">(counts less in ratio suggestions)</span></span>
+        </div>
+
         <!-- Food memory panel — shown when note typed + no carbs -->
         <div id="fm-panel">
           <div id="fm-matches" class="fm-matches"></div>
@@ -446,7 +452,7 @@ canvas{display:block;}
           <button class="sit-btn" data-sit="2"><span class="sit-icon">🤒</span>Unwell</button>
         </div>
 
-        <div class="toggle-row" style="padding:0 0 12px;">
+        <div class="toggle-row" style="display:none;padding:0 0 12px;">
           <label>Fasting reading</label>
           <div class="toggle" id="fasting-toggle" onclick="this.classList.toggle('on')"></div>
         </div>
@@ -468,7 +474,7 @@ canvas{display:block;}
         <div style="border-top:1px solid rgba(45,90,61,0.15);padding-top:12px;">
           <label style="display:block;font-size:12px;color:var(--accent);font-weight:500;margin-bottom:6px;">Units you will actually take</label>
           <div style="display:flex;gap:8px;align-items:center;">
-            <div class="suffix" style="flex:1;"><input type="number" id="actual-dose" step="0.5" min="0" max="100" inputmode="decimal" placeholder="e.g. 4.0 or 4.5" style="background:#fff;border-color:rgba(45,90,61,0.25);"><span class="suffix-label" style="color:var(--accent);opacity:0.7;">u</span></div>
+            <div class="suffix" style="flex:1;"><input type="number" id="actual-dose" step="0.5" min="0" max="100" inputmode="decimal" placeholder="e.g. 4.0 or 4.5" style="background:#fff;border-color:rgba(45,90,61,0.25);font-size:20px;font-weight:600;padding:14px 40px 14px 16px;"><span class="suffix-label" style="color:var(--accent);opacity:0.7;">u</span></div>
             <button onclick="confirmDose()" style="padding:12px 16px;border-radius:var(--radius-sm);border:none;background:var(--accent);color:#fff;font-size:14px;font-weight:500;font-family:'DM Sans',sans-serif;cursor:pointer;white-space:nowrap;">Save</button>
           </div>
           <p style="font-size:11px;color:var(--accent);margin-top:8px;opacity:0.65;">You'll be reminded to log post-meal BG in ~2h</p>
@@ -555,7 +561,7 @@ canvas{display:block;}
     <div class="screen" id="screen-settings">
       <div class="card">
         <p class="card-label">Insulin-to-carb ratios</p>
-        <p style="font-size:12px;color:var(--text3);margin-bottom:12px;">Current · 14-day suggestion (min. 5 days with paired readings, weighted by recency)</p>
+        <p style="font-size:12px;color:var(--text3);margin-bottom:12px;">Current · 28-day suggestion (min. 5 days with paired readings, recency-weighted)</p>
         <div id="ratio-rows"></div>
       </div>
       <div class="card">
@@ -892,6 +898,7 @@ function calculate(){
   const note=document.getElementById('c-note').value.trim();
   const fasting=document.getElementById('fasting-toggle').classList.contains('on');
   pendingEntry={meal:selectedMeal,bg,carbs:noCarbs?null:carbs,noCarbs,
+    carbsEstimated:!noCarbs&&document.getElementById('carbs-est-toggle').classList.contains('on'),
     mealDose:+mealDose.toFixed(2),corrDose:+corrDose.toFixed(2),
     iobAdj:+iobAdj.toFixed(2),iob:+iob.toFixed(2),situation:selectedSituation,
     trendAdj:+trendAdj.toFixed(2),suggested:+total.toFixed(2),
@@ -914,6 +921,8 @@ function confirmDose(){
   document.getElementById('result-box').classList.remove('show');
   document.getElementById('c-bg').value='';
   document.getElementById('c-carbs').value='';
+  document.getElementById('carbs-est-toggle').classList.remove('on');
+  document.getElementById('carbs-est-row').style.display='none';
   document.getElementById('c-note').value='';
   document.getElementById('fasting-toggle').classList.remove('on');
   // Reset food memory
@@ -1433,8 +1442,8 @@ function exportPDF(){
 
 // ── Ratio suggestions (weighted, min 5) ──
 function computeSuggestions(){
-  const fourteenDays=Date.now()-14*24*60*60*1000;
-  const cutoff=Math.max(fourteenDays,suggestResetTs);
+  const twentyEightDays=Date.now()-28*24*60*60*1000;
+  const cutoff=Math.max(twentyEightDays,suggestResetTs);
   return MEALS.map((_,i)=>{
     const isAfternoon=i===3; // Afternoon snack index
     const minDays=isAfternoon?4:5;
@@ -1448,24 +1457,27 @@ function computeSuggestions(){
     const uniqueDays=new Set(entries.map(e=>new Date(e.ts).toDateString())).size;
     if(uniqueDays<minDays) return null;
 
-    // Weight by recency — newer = higher weight, decays over 14 days
+    // Two-phase decay: days 0–14 → 1.0 to 0.5, days 15–28 → 0.5 to 0.1
     const now=Date.now();
     let weightedPost=0,totalWeight=0;
     entries.forEach(e=>{
       const ageDays=(now-new Date(e.ts).getTime())/(24*60*60*1000);
-      const recencyW=Math.max(0.1,1-(ageDays/14)*0.9);
+      let recencyW;
+      if(ageDays<=14) recencyW=1-(ageDays/14)*0.5;        // 1.0 → 0.5
+      else recencyW=Math.max(0.1,0.5-((ageDays-14)/14)*0.4); // 0.5 → 0.1
 
       // Timing penalty: fast drop to low = ratio was aggressive
-      // Only applies when postBg < 70 AND postTs is available
       let timingW=1.0;
       if(e.postBg<70&&e.postTs){
         const elapsedMin=(new Date(e.postTs).getTime()-new Date(e.ts).getTime())/60000;
-        if(elapsedMin<100) timingW=1.5;       // fast drop — high penalty, pulls ratio down more
-        else if(elapsedMin<140) timingW=1.25; // moderate drop — mild extra penalty
-        // above 140min: no extra penalty, existing low outcome weight applies
+        if(elapsedMin<100) timingW=1.5;
+        else if(elapsedMin<140) timingW=1.25;
       }
 
-      const weight=recencyW*timingW;
+      // Estimated-carbs penalty: rough estimates count half
+      const estimateW=e.carbsEstimated?0.5:1.0;
+
+      const weight=recencyW*timingW*estimateW;
       weightedPost+=e.postBg*weight;
       totalWeight+=weight;
     });
@@ -1687,6 +1699,18 @@ function renderWeekly(){
   const avgActual=doseLogs.length?(doseLogs.reduce((a,e)=>a+e.total,0)/doseLogs.length).toFixed(1):null;
   const avgSugg=doseLogs.filter(e=>e.suggested).length?(doseLogs.filter(e=>e.suggested).reduce((a,e)=>a+(e.suggested||0),0)/doseLogs.filter(e=>e.suggested).length).toFixed(1):null;
 
+  // Carb stats — only entries with carbs logged
+  const carbEntries=doseLogs.filter(e=>!e.noCarbs&&e.carbs!=null);
+  const totalCarbs=carbEntries.reduce((a,e)=>a+e.carbs,0);
+  const avgDailyCarbs=carbEntries.length?(totalCarbs/days).toFixed(0):null;
+  const avgCarbsMeal=carbEntries.length?(totalCarbs/carbEntries.length).toFixed(0):null;
+  // Carbs per unit — effective real-world ratio (carb entries only)
+  const insulinOnCarbEntries=carbEntries.reduce((a,e)=>a+e.total,0);
+  const carbsPerUnit=insulinOnCarbEntries>0?(totalCarbs/insulinOnCarbEntries).toFixed(1):null;
+  // Lows / highs from post-BG readings
+  const lowCount=withPost.filter(e=>e.postBg<70).length;
+  const highCount=withPost.filter(e=>e.postBg>settings.target+30).length;
+
   // per-meal
   let mealRows='';
   for(let i=0;i<6;i++){
@@ -1726,9 +1750,13 @@ function renderWeekly(){
 
     <div class="week-stat-grid">
       ${avgBg?`<div class="week-stat"><div class="week-stat-val">${avgBg}</div><div class="week-stat-lbl">Avg BG mg/dL</div></div>`:''}
-      ${pct!==null?`<div class="week-stat"><div class="week-stat-val" style="color:var(--accent);">${pct}%</div><div class="week-stat-lbl">On target</div></div>`:''}
+      ${pct!==null?`<div class="week-stat"><div class="week-stat-val" style="color:var(--accent);">${pct}%</div><div class="week-stat-lbl">Doses on target<br><span style="font-size:10px;color:var(--text3);">post-BG near target</span></div></div>`:''}
       ${avgDailyInsulin!=='0.0'?`<div class="week-stat"><div class="week-stat-val">${avgDailyInsulin}u</div><div class="week-stat-lbl">Avg daily insulin</div></div>`:''}
+      ${avgDailyCarbs?`<div class="week-stat"><div class="week-stat-val">${avgDailyCarbs}g</div><div class="week-stat-lbl">Avg daily carbs</div></div>`:''}
       ${avgActual&&avgSugg?`<div class="week-stat"><div class="week-stat-val">${avgActual}u</div><div class="week-stat-lbl">Avg actual dose<br><span style="font-size:10px;color:var(--text3);">(suggested ${avgSugg}u)</span></div></div>`:''}
+      ${carbsPerUnit?`<div class="week-stat"><div class="week-stat-val">${carbsPerUnit}<span style="font-size:13px;font-weight:500;color:var(--text3);">g/u</span></div><div class="week-stat-lbl">Carbs per unit</div></div>`:''}
+      ${avgCarbsMeal?`<div class="week-stat"><div class="week-stat-val">${avgCarbsMeal}g</div><div class="week-stat-lbl">Avg carbs / meal</div></div>`:''}
+      ${withPost.length?`<div class="week-stat"><div class="week-stat-val"><span style="color:var(--low);">${lowCount} ↓</span> <span style="font-size:14px;color:var(--text3);">·</span> <span style="color:#c0392b;">${highCount} ↑</span></div><div class="week-stat-lbl">Lows · Highs</div></div>`:''}
     </div>
 
     ${tir?`<div class="card" style="padding:14px;">
@@ -1883,6 +1911,8 @@ function confirmManualDose(){
   // Reset form
   document.getElementById('c-bg').value='';
   document.getElementById('c-carbs').value='';
+  document.getElementById('carbs-est-toggle').classList.remove('on');
+  document.getElementById('carbs-est-row').style.display='none';
   document.getElementById('c-note').value='';
   document.getElementById('manual-dose-input').value='';
   document.getElementById('fasting-toggle').classList.remove('on');
@@ -2072,6 +2102,10 @@ document.getElementById('c-carbs').addEventListener('input',()=>{
     document.getElementById('fm-panel').classList.remove('show');
     fmSelected.clear();fmMatches=[];
   }
+  // Estimated flag only relevant when carbs are present
+  const hasCarbs=document.getElementById('c-carbs').value!=='';
+  document.getElementById('carbs-est-row').style.display=hasCarbs?'flex':'none';
+  if(!hasCarbs) document.getElementById('carbs-est-toggle').classList.remove('on');
   updateCalcButtons();
 });
 
@@ -2369,19 +2403,16 @@ function renderReportPreview(span){
   const glucoseLogs=log.filter(e=>e.type==='glucose'&&new Date(e.ts).getTime()>=cutoff);
   const withPost=doseLogs.filter(e=>e.postBg!==null);
   const tir=computeTIR(withPost);
-  const allBg=[...doseLogs.map(e=>e.bg),...glucoseLogs.map(e=>e.bg)];
+  const allBg=[...doseLogs.map(e=>e.bg),...doseLogs.filter(e=>e.postBg!==null).map(e=>e.postBg),...glucoseLogs.map(e=>e.bg)];
   const avgBg=allBg.length?(allBg.reduce((a,b)=>a+b,0)/allBg.length).toFixed(0):null;
   const hba1cSpan=allBg.length>=5?((parseFloat(avgBg)+46.7)/28.7).toFixed(1):null;
-  // 90-day HbA1c — always fixed regardless of span
-  const bg90=log.filter(e=>new Date(e.ts).getTime()>Date.now()-90*24*60*60*1000);
-  const allBg90=[...bg90.filter(e=>e.type==='dose').map(e=>e.bg),...bg90.filter(e=>e.type==='glucose').map(e=>e.bg)];
-  const avg90=allBg90.length?(allBg90.reduce((a,b)=>a+b,0)/allBg90.length):null;
-  const hba1c90=avg90?((avg90+46.7)/28.7).toFixed(1):null;
+  // 90-day HbA1c — same source as Trends screen, always fixed regardless of span
+  const hba1c90=estimateHbA1c();
   // Show span sub-line only when span is meaningfully different from 90d
   const showSpanHba1c=hba1cSpan&&hba1c90&&hba1cSpan!==hba1c90&&span!=='3m'&&span!=='all';
   const fastings=[...doseLogs.filter(e=>e.fasting),...glucoseLogs.filter(e=>e.fasting)];
   const fastAvg=fastings.length?(fastings.reduce((a,e)=>a+e.bg,0)/fastings.length).toFixed(0):null;
-  const suggestions=computeSuggestions(); // always 14-day regardless of span
+  const suggestions=computeSuggestions(); // always 28-day regardless of span
   const tolerance=0.5;
   const calcDoses=doseLogs.filter(e=>e.suggested!=null);
   const onTarget=calcDoses.filter(e=>Math.abs(e.total-e.suggested)<=tolerance);
@@ -2428,7 +2459,7 @@ function renderReportPreview(span){
   }
   if(fastAvg) mealRows+=`<tr style="color:#888;font-style:italic;border-top:1px solid var(--surface2);"><td>Fasting</td><td>${fastAvg}</td><td>—</td><td>—</td><td>—</td></tr>`;
 
-  // Ratio suggestions — always 14-day
+  // Ratio suggestions — always 28-day
   let ratioRows='';
   MEALS.forEach((m,i)=>{
     const s=suggestions[i];
@@ -2445,6 +2476,16 @@ function renderReportPreview(span){
   // Snapshot
   const fastBox=fastAvg?`<div class="rp-box" style="background:#e8f5e9;"><div class="rp-box-label" style="color:#2d5a3d;">FASTING GLUCOSE</div><div class="rp-box-val" style="color:#2d5a3d;">${fastAvg} mg/dL</div><div class="rp-box-sub" style="color:#2d5a3d;">${fastings.length} readings</div></div>`:'';
   const accBox=pct!==null?`<div class="rp-box" style="background:#edeae3;"><div class="rp-box-label" style="color:#2d5a3d;">DOSE ACCURACY</div><div class="rp-box-val" style="color:#2d5a3d;">${pct}% on target</div><div class="rp-box-sub" style="color:${avgOverride>0.1?'#d4891a':avgOverride<-0.1?'#c0392b':'#2d5a3d'};">${avgOverride>=0?'+':''}${avgOverride.toFixed(1)} u avg override</div></div>`:'';
+
+  // Daily averages — carbs & insulin over the selected span
+  const spanDays=Math.max(1,Math.ceil((Date.now()-Math.max(cutoff,doseLogs.length?new Date(doseLogs[doseLogs.length-1].ts).getTime():cutoff))/(24*60*60*1000)));
+  const rpCarbEntries=doseLogs.filter(e=>!e.noCarbs&&e.carbs!=null);
+  const rpTotalCarbs=rpCarbEntries.reduce((a,e)=>a+e.carbs,0);
+  const rpTotalInsulin=doseLogs.reduce((a,e)=>a+e.total,0);
+  const rpAvgDailyCarbs=rpCarbEntries.length?(rpTotalCarbs/spanDays).toFixed(0):null;
+  const rpAvgDailyInsulin=doseLogs.length?(rpTotalInsulin/spanDays).toFixed(1):null;
+  const rpCarbsPerUnit=rpCarbEntries.length&&rpCarbEntries.reduce((a,e)=>a+e.total,0)>0?(rpTotalCarbs/rpCarbEntries.reduce((a,e)=>a+e.total,0)).toFixed(1):null;
+  const dailyBox=(rpAvgDailyCarbs||rpAvgDailyInsulin)?`<div class="rp-box" style="background:#e8f5e9;"><div class="rp-box-label" style="color:#2d5a3d;">DAILY AVERAGES</div><div class="rp-box-val" style="color:#2d5a3d;">${rpAvgDailyInsulin?rpAvgDailyInsulin+'u':'—'} <span style="font-size:9px;font-weight:400;">insulin</span> · ${rpAvgDailyCarbs?rpAvgDailyCarbs+'g':'—'} <span style="font-size:9px;font-weight:400;">carbs</span></div>${rpCarbsPerUnit?`<div class="rp-box-sub" style="color:#2d5a3d;">${rpCarbsPerUnit} g/u effective ratio</div>`:''}</div>`:'';
 
   // Chart data
   const chartData=getChartData(span,doseLogs);
@@ -2470,15 +2511,15 @@ function renderReportPreview(span){
       </div>
       <div>
         <div class="rp-section">Snapshot</div>
-        ${fastBox}${accBox}
+        ${fastBox}${accBox}${dailyBox}
       </div>
     </div>
-    <div class="rp-section">Ratio Suggestions <span style="font-weight:400;font-style:italic;color:var(--text3);text-transform:none;letter-spacing:0;font-size:8px;">— always last 14 days</span></div>
+    <div class="rp-section">Ratio Suggestions <span style="font-weight:400;font-style:italic;color:var(--text3);text-transform:none;letter-spacing:0;font-size:8px;">— always last 28 days</span></div>
     <table class="rp-table">
       <thead><tr><th>Meal</th><th>Current · Used</th><th>Suggested</th><th>Signal</th></tr></thead>
       <tbody>${ratioRows}</tbody>
     </table>
-    <p style="font-size:7px;color:var(--text3);margin-top:3px;font-style:italic;">Suggestions always reflect the last 14 days, independent of selected period.</p>
+    <p style="font-size:7px;color:var(--text3);margin-top:3px;font-style:italic;">Suggestions always reflect the last 28 days, independent of selected period.</p>
     <div class="rp-section">Avg Glucose & Time in Range — ${chartTitle}</div>
     <div class="rp-chart-legend">
       <div class="rp-legend-item"><svg width="16" height="8"><line x1="0" y1="4" x2="16" y2="4" stroke="#2d5a3d" stroke-width="2"/></svg>Avg BG (mg/dL)</div>
